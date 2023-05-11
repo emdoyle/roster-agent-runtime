@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local development files
+.idea/
+*.iml
+
+# Test reports and coverage data
+htmlcov/
+.coverage
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Logs and temporary files
+*.log
+*.swp
+*~
+
+# Environment config
+.env
+
+# Mac OS X
+.DS_Store
