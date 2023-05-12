@@ -11,10 +11,20 @@ class AgentCapabilities(BaseModel):
         False, description="Whether the agent can message other agents or not."
     )
 
+    class Config:
+        validate_assignment = True
+        schema_extra = {
+            "example": {
+                "network_access": False,
+                "messaging_access": False,
+            },
+        }
+
 
 class AgentResource(BaseModel):
     image: str = Field(description="The container image to be used for this agent.")
     name: str = Field(description="A name to identify the agent.")
+    status: str = Field(default="uninitialized", description="The status of the agent.")
     capabilities: AgentCapabilities = Field(
         default_factory=lambda: AgentCapabilities(),
         description="The capabilities of the agent.",
@@ -26,15 +36,14 @@ class AgentResource(BaseModel):
             "example": {
                 "image": "my_image:latest",
                 "name": "Alice",
-                "capabilities": {
-                    "network_access": False,
-                    "messaging_access": False,
-                },
+                "status": "ready",
+                "capabilities": AgentCapabilities.Config.schema_extra["example"],
             }
         }
 
 
 class AgentContainer(BaseModel):
+    agent_name: str = Field(description="The name of the agent.")
     id: str = Field(description="The id of the container.")
     image: str = Field(description="The container image.")
     name: str = Field(
@@ -42,7 +51,6 @@ class AgentContainer(BaseModel):
         regex=r"^/?[a-zA-Z0-9][a-zA-Z0-9_.-]+$",
         description="The container name.",
     )
-    agent_name: str = Field(description="The name of the agent.")
     status: str = Field(description="The status of the container.")
     labels: Optional[dict[str, str]] = Field(
         default=None, description="The labels of the container."
@@ -55,13 +63,12 @@ class AgentContainer(BaseModel):
         validate_assignment = True
         schema_extra = {
             "example": {
+                "agent_name": "Alice",
                 "id": "my_container_id",
                 "image": "my_image:latest",
-                "name": "Alice",
+                "name": "my_container_name",
                 "status": "running",
-                "capabilities": {
-                    "network_access": False,
-                    "messaging_access": False,
-                },
+                "labels": {"my_label": "my_value"},
+                "capabilities": AgentCapabilities.Config.schema_extra["example"],
             }
         }
