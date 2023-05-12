@@ -1,4 +1,5 @@
 import json
+import platform
 
 import websocket
 from roster_agent_runtime.models.agent import (
@@ -16,6 +17,29 @@ from roster_agent_runtime.services.agent import errors
 from roster_agent_runtime.services.agent.base import AgentService
 
 import docker
+
+
+def get_host_ip(network_name="bridge", client=None):
+    os_name = platform.system()
+
+    if os_name == "Linux":
+        client = client or docker.from_env()
+        network = client.networks.get(network_name)
+        try:
+            gateway = network.attrs["IPAM"]["Config"][0]["Gateway"]
+        except (IndexError, KeyError):
+            raise errors.AgentServiceError(
+                "Could not determine host IP for network: {}".format(network_name)
+            )
+        return gateway
+
+    elif os_name == "Darwin" or os_name == "Windows":
+        return "host.docker.internal"
+
+    else:
+        raise errors.AgentServiceError(
+            "Unsupported operating system: {}".format(os_name)
+        )
 
 
 def serialize_agent_container(
@@ -37,7 +61,8 @@ def serialize_agent_container(
     )
 
 
-# TODO: Consider using a websocket client library; make interface async
+# TODO: Consider using a websocket client library
+#  - make interface async (this requires some work for Docker client operations)
 class DockerAgentService(AgentService):
     ROSTER_CONTAINER_LABEL = "roster-agent"
 
@@ -51,6 +76,16 @@ class DockerAgentService(AgentService):
             self.conversations = {}
         except docker.errors.DockerException as e:
             raise errors.AgentServiceError("Could not connect to Docker daemon.") from e
+
+    @property
+    def host_ip(self):
+        return get_host_ip(client=self.client)
+
+    def _labels_for_agent(self, agent: AgentResource) -> dict:
+        return {
+            self.ROSTER_CONTAINER_LABEL: agent.name,
+            "messaging_access": str(agent.capabilities.messaging_access),
+        }
 
     def create_agent(self, agent: AgentResource) -> AgentResource:
         if agent.name in self.agents:
@@ -99,17 +134,18 @@ class DockerAgentService(AgentService):
             raise errors.AgentNotFoundError(agent=name) from e
 
         try:
-            """check network_access capabilities from agent and set network_mode accordingly"""
             if agent.capabilities.network_access:
                 network_mode = "default"
             else:
                 network_mode = None
+
             container = self.client.containers.run(
                 agent.image,
                 detach=True,
-                labels={self.ROSTER_CONTAINER_LABEL: name},
+                labels=self._labels_for_agent(agent),
                 network_mode=network_mode,
                 environment={
+                    "ROSTER_RUNTIME_IP": self.host_ip,
                     "ROSTER_AGENT_NAME": name,
                     "ROSTER_AGENT_TASK_ID": task.id,
                     "ROSTER_AGENT_TASK_NAME": task.name,
@@ -140,9 +176,10 @@ class DockerAgentService(AgentService):
             container = self.client.containers.run(
                 agent.image,
                 detach=True,
-                labels={self.ROSTER_CONTAINER_LABEL: name},
+                labels=self._labels_for_agent(agent),
                 ports={"8000/tcp": None},
                 environment={
+                    "ROSTER_RUNTIME_IP": self.host_ip,
                     "ROSTER_AGENT_NAME": name,
                     "ROSTER_AGENT_CONVERSATION_ID": conversation.id,
                     "ROSTER_AGENT_CONVERSATION_NAME": conversation.name,
