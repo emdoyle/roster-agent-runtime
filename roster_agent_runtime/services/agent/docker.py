@@ -1,7 +1,8 @@
 import json
+import os
 import platform
 
-import websocket
+import websockets
 from roster_agent_runtime.models.agent import (
     AgentCapabilities,
     AgentContainer,
@@ -15,6 +16,8 @@ from roster_agent_runtime.models.conversation import (
 from roster_agent_runtime.models.task import TaskResource
 from roster_agent_runtime.services.agent import errors
 from roster_agent_runtime.services.agent.base import AgentService
+from roster_agent_runtime.util import aretry
+from websocket import WebSocket
 
 import docker
 
@@ -61,8 +64,7 @@ def serialize_agent_container(
     )
 
 
-# TODO: Consider using a websocket client library
-#  - make interface async (this requires some work for Docker client operations)
+# TODO: make docker client operations async
 class DockerAgentService(AgentService):
     ROSTER_CONTAINER_LABEL = "roster-agent"
 
@@ -71,9 +73,9 @@ class DockerAgentService(AgentService):
             self.client = docker.from_env()
             # consider using docker-py's events API to keep this up to date
             # also consider using sqlite to persist this data
-            self.agents = {}
-            self.tasks = {}
-            self.conversations = {}
+            self.agents: dict[str, AgentResource] = {}
+            self.tasks: dict[str, TaskResource] = {}
+            self.conversations: dict[str, tuple[ConversationResource, WebSocket]] = {}
         except docker.errors.DockerException as e:
             raise errors.AgentServiceError("Could not connect to Docker daemon.") from e
 
@@ -87,7 +89,7 @@ class DockerAgentService(AgentService):
             "messaging_access": str(agent.capabilities.messaging_access),
         }
 
-    def create_agent(self, agent: AgentResource) -> AgentResource:
+    async def create_agent(self, agent: AgentResource) -> AgentResource:
         if agent.name in self.agents:
             raise errors.AgentAlreadyExistsError(agent=agent.name)
         self.agents[agent.name] = agent
@@ -99,16 +101,16 @@ class DockerAgentService(AgentService):
         agent.status = "ready"
         return agent
 
-    def list_agents(self) -> list[AgentResource]:
+    async def list_agents(self) -> list[AgentResource]:
         return list(self.agents.values())
 
-    def get_agent(self, name: str) -> AgentResource:
+    async def get_agent(self, name: str) -> AgentResource:
         try:
             return self.agents[name]
         except KeyError as e:
             raise errors.AgentNotFoundError(agent=name) from e
 
-    def delete_agent(self, name: str) -> AgentResource:
+    async def delete_agent(self, name: str) -> AgentResource:
         try:
             agent = self.agents.pop(name)
         except KeyError as e:
@@ -126,7 +128,7 @@ class DockerAgentService(AgentService):
         agent.status = "deleted"
         return agent
 
-    def initiate_task(self, name: str, task: TaskResource) -> TaskResource:
+    async def initiate_task(self, name: str, task: TaskResource) -> TaskResource:
         """if the agent exists, use the AgentResource to run a container for the task"""
         try:
             agent = self.agents[name]
@@ -160,7 +162,7 @@ class DockerAgentService(AgentService):
         task.container = serialize_agent_container(container)
         return task
 
-    def start_conversation(
+    async def start_conversation(
         self, name: str, conversation: ConversationResource
     ) -> ConversationResource:
         try:
@@ -184,6 +186,8 @@ class DockerAgentService(AgentService):
                     "ROSTER_AGENT_CONVERSATION_ID": conversation.id,
                     "ROSTER_AGENT_CONVERSATION_NAME": conversation.name,
                     "ROSTER_AGENT_CONVERSATION_PORT": "8000",
+                    # TODO: how is non-roster env passed to agents?
+                    "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
                 },
             )
         except docker.errors.APIError as e:
@@ -191,36 +195,39 @@ class DockerAgentService(AgentService):
                 f"Could not start conversation {conversation.name} on agent {name}."
             ) from e
 
-        # TODO: actually need to wait for the websocket server to start up and become healthy
+        container.reload()
 
-        try:
-            ws_conn = websocket.create_connection(
-                f"ws://localhost:{container.ports['8000/tcp'][0]}"
+        async def _connect():
+            return await websockets.connect(
+                f"ws://localhost:{container.ports['8000/tcp'][0]['HostPort']}"
             )
-        except websocket.WebSocketException as e:
-            raise errors.AgentServiceError(
-                f"Could not connect to conversation {conversation.id} on agent {name}."
-            ) from e
+
+        connection = await aretry(_connect)
+        self.conversations[conversation.id] = (conversation, connection)
+
         conversation.status = "running"
         conversation.container = serialize_agent_container(container)
-        self.conversations[conversation.id] = (conversation, ws_conn)
         return conversation
 
-    def prompt(
+    async def prompt(
         self, name: str, conversation_id: str, conversation_prompt: ConversationPrompt
     ) -> ConversationResource:
         try:
-            conversation = self.conversations[conversation_id]
+            conversation, ws_conn = self.conversations[conversation_id]
         except KeyError as e:
             raise errors.ConversationNotFoundError(conversation=conversation_id) from e
-        if conversation[0].agent_name != name:
+        if conversation.agent_name != name:
             raise errors.ConversationNotFoundError(conversation=conversation_id)
         try:
-            conversation[1].send(json.dumps(conversation_prompt.message.dict()))
-            response = conversation[1].recv()
-            message = ConversationMessage(**json.loads(response))
-            conversation[0].history.append(message)
-        except websocket.WebSocketException as e:
+            # TODO: send full prompt message, decode in agent
+            await ws_conn.send(conversation_prompt.message.message)
+            conversation.history.append(conversation_prompt.message)
+            response = await ws_conn.recv()
+            message = ConversationMessage(
+                sender=conversation.agent_name, message=response
+            )
+            conversation.history.append(message)
+        except websockets.WebSocketException as e:
             raise errors.AgentServiceError(
                 f"Could not prompt conversation {conversation_id} on agent {name}."
             ) from e
@@ -228,9 +235,11 @@ class DockerAgentService(AgentService):
             raise errors.AgentServiceError(
                 f"Could not parse response from conversation {conversation_id} on agent {name}."
             ) from e
-        return conversation[0]
+        return conversation
 
-    def end_conversation(self, name: str, conversation_id: str) -> ConversationResource:
+    async def end_conversation(
+        self, name: str, conversation_id: str
+    ) -> ConversationResource:
         try:
             conversation = self.conversations.pop(conversation_id)
         except KeyError as e:

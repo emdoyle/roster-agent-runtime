@@ -25,26 +25,26 @@ router = APIRouter(route_class=route)
 async def create_agent(
     agent: AgentResource, agent_service: AgentService = Depends(get_agent_service)
 ):
-    return agent_service.create_agent(agent)
+    return await agent_service.create_agent(agent)
 
 
 @router.get("/agent", response_model=list[AgentResource])
 async def list_agents(agent_service: AgentService = Depends(get_agent_service)):
-    return agent_service.list_agents()
+    return await agent_service.list_agents()
 
 
 @router.get("/agent/{name}", response_model=AgentResource)
 async def get_agent(
     name: str, agent_service: AgentService = Depends(get_agent_service)
 ):
-    return agent_service.get_agent(name)
+    return await agent_service.get_agent(name)
 
 
 @router.delete("/agent/{name}", response_model=AgentResource)
 async def delete_agent(
     name: str, agent_service: AgentService = Depends(get_agent_service)
 ):
-    return agent_service.delete_agent(name)
+    return await agent_service.delete_agent(name)
 
 
 @router.post("/agent/{name}/task", response_model=TaskResource)
@@ -53,7 +53,7 @@ async def initiate_task(
     task: TaskResource,
     agent_service: AgentService = Depends(get_agent_service),
 ):
-    return agent_service.initiate_task(name, task)
+    return await agent_service.initiate_task(name, task)
 
 
 @router.post("/agent/{name}/conversation", response_model=ConversationResource)
@@ -62,7 +62,7 @@ async def start_conversation(
     conversation: ConversationResource,
     agent_service: AgentService = Depends(get_agent_service),
 ):
-    return agent_service.start_conversation(name, conversation)
+    return await agent_service.start_conversation(name, conversation)
 
 
 @router.post(
@@ -75,7 +75,7 @@ async def prompt(
     conversation_prompt: ConversationPrompt,
     agent_service: AgentService = Depends(get_agent_service),
 ):
-    return agent_service.prompt(name, conversation_id, conversation_prompt)
+    return await agent_service.prompt(name, conversation_id, conversation_prompt)
 
 
 @router.post(
@@ -87,7 +87,7 @@ async def end_conversation(
     conversation_id: str,
     agent_service: AgentService = Depends(get_agent_service),
 ):
-    return agent_service.end_conversation(name, conversation_id)
+    return await agent_service.end_conversation(name, conversation_id)
 
 
 # Exception Handlers

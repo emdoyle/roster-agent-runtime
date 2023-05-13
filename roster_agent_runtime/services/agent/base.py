@@ -24,37 +24,39 @@ def get_agent_service() -> "AgentService":
 
 class AgentService(ABC):
     @abstractmethod
-    def create_agent(self, agent: AgentResource) -> AgentResource:
+    async def create_agent(self, agent: AgentResource) -> AgentResource:
         """create agent"""
 
     @abstractmethod
-    def list_agents(self) -> list[AgentResource]:
+    async def list_agents(self) -> list[AgentResource]:
         """list agents"""
 
     @abstractmethod
-    def get_agent(self, name: str) -> AgentResource:
+    async def get_agent(self, name: str) -> AgentResource:
         """get agent by name"""
 
     @abstractmethod
-    def delete_agent(self, name: str) -> AgentResource:
+    async def delete_agent(self, name: str) -> AgentResource:
         """delete agent by name"""
 
     @abstractmethod
-    def initiate_task(self, name: str, task: TaskResource) -> TaskResource:
+    async def initiate_task(self, name: str, task: TaskResource) -> TaskResource:
         """start task on agent by name"""
 
     @abstractmethod
-    def start_conversation(
+    async def start_conversation(
         self, name: str, conversation: ConversationResource
     ) -> ConversationResource:
         """start conversation on agent by name"""
 
     @abstractmethod
-    def prompt(
+    async def prompt(
         self, name: str, conversation_id: str, conversation_prompt: ConversationPrompt
     ) -> ConversationResource:
         """prompt agent by name in conversation"""
 
     @abstractmethod
-    def end_conversation(self, name: str, conversation_id: str) -> ConversationResource:
+    async def end_conversation(
+        self, name: str, conversation_id: str
+    ) -> ConversationResource:
         """end conversation on agent by name"""

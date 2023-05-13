@@ -4,15 +4,17 @@ version = "0.1.0"
 description = "Agent Runtime Interface for Roster"
 authors = ["Evan Doyle <evanmdoyle@gmail.com>"]
 
+[tool.poetry.scripts]
+roster-agent-runtime = "roster_agent_runtime.main:run"
+
 [tool.poetry.dependencies]
 python = "^3.8"
 fastapi = "^0.95.1"
 uvicorn = "^0.22.0"
 environs = "^9.5.0"
 docker = "^6.1.1"
+websockets = "^11.0.3"
 
-[tool.poetry.scripts]
-roster-agent-runtime = "roster_agent_runtime.main:run"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.4"
@@ -20,5 +22,5 @@ black = "^23.3.0"
 isort = "^5.12.0"
 
 [build-system]
-requires = ["poetry>=1.1.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.masonry.api"
