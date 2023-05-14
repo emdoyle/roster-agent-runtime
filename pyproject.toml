@@ -13,7 +13,6 @@ fastapi = "^0.95.1"
 uvicorn = "^0.22.0"
 environs = "^9.5.0"
 docker = "^6.1.1"
-websockets = "^11.0.3"
 
 
 [tool.poetry.dev-dependencies]

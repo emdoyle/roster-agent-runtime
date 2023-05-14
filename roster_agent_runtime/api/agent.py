@@ -47,47 +47,43 @@ async def delete_agent(
     return await agent_service.delete_agent(name)
 
 
-@router.post("/agent/{name}/task", response_model=TaskResource)
+@router.post("/task", response_model=TaskResource)
 async def initiate_task(
-    name: str,
     task: TaskResource,
     agent_service: AgentService = Depends(get_agent_service),
 ):
-    return await agent_service.initiate_task(name, task)
+    return await agent_service.initiate_task(task)
 
 
-@router.post("/agent/{name}/conversation", response_model=ConversationResource)
+@router.post("/conversation", response_model=ConversationResource)
 async def start_conversation(
-    name: str,
     conversation: ConversationResource,
     agent_service: AgentService = Depends(get_agent_service),
 ):
-    return await agent_service.start_conversation(name, conversation)
+    return await agent_service.start_conversation(conversation)
 
 
 @router.post(
-    "/agent/{name}/conversation/{conversation_id}/prompt",
+    "/conversation/{conversation_id}/prompt",
     response_model=ConversationResource,
 )
 async def prompt(
-    name: str,
     conversation_id: str,
     conversation_prompt: ConversationPrompt,
     agent_service: AgentService = Depends(get_agent_service),
 ):
-    return await agent_service.prompt(name, conversation_id, conversation_prompt)
+    return await agent_service.prompt(conversation_id, conversation_prompt)
 
 
 @router.post(
-    "/agent/{name}/conversation/{conversation_id}/end",
+    "/conversation/{conversation_id}/end",
     response_model=ConversationResource,
 )
 async def end_conversation(
-    name: str,
     conversation_id: str,
     agent_service: AgentService = Depends(get_agent_service),
 ):
-    return await agent_service.end_conversation(name, conversation_id)
+    return await agent_service.end_conversation(conversation_id)
 
 
 # Exception Handlers

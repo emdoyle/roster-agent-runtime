@@ -16,9 +16,12 @@ def get_agent_service() -> "AgentService":
     if AGENT_SERVICE is not None:
         return AGENT_SERVICE
 
-    from .docker import DockerAgentService
+    # These should both be configurable in settings
+    from roster_agent_runtime.executors.docker import DockerAgentExecutor
 
-    AGENT_SERVICE = DockerAgentService()
+    from .local import LocalAgentService
+
+    AGENT_SERVICE = LocalAgentService(executor=DockerAgentExecutor())
     return AGENT_SERVICE
 
 
@@ -40,23 +43,21 @@ class AgentService(ABC):
         """delete agent by name"""
 
     @abstractmethod
-    async def initiate_task(self, name: str, task: TaskResource) -> TaskResource:
-        """start task on agent by name"""
+    async def initiate_task(self, task: TaskResource) -> TaskResource:
+        """start task"""
 
     @abstractmethod
     async def start_conversation(
-        self, name: str, conversation: ConversationResource
+        self, conversation: ConversationResource
     ) -> ConversationResource:
-        """start conversation on agent by name"""
+        """start conversation"""
 
     @abstractmethod
     async def prompt(
-        self, name: str, conversation_id: str, conversation_prompt: ConversationPrompt
+        self, conversation_id: str, conversation_prompt: ConversationPrompt
     ) -> ConversationResource:
-        """prompt agent by name in conversation"""
+        """prompt agent in conversation"""
 
     @abstractmethod
-    async def end_conversation(
-        self, name: str, conversation_id: str
-    ) -> ConversationResource:
-        """end conversation on agent by name"""
+    async def end_conversation(self, conversation_id: str) -> ConversationResource:
+        """end conversation"""

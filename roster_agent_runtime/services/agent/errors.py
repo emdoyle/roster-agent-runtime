@@ -54,6 +54,43 @@ class AgentNotFoundError(AgentServiceError):
         self.agent = agent
 
 
+class TaskError(AgentServiceError):
+    """Base exception class for Task errors."""
+
+    def __init__(
+        self,
+        message="An unexpected error occurred for the Task.",
+        details=None,
+        task=None,
+    ):
+        super().__init__(message, details)
+        self.task = task
+
+
+class TaskAlreadyExistsError(TaskError):
+    """Exception raised when a Task already exists."""
+
+    def __init__(
+        self,
+        message="A Task with this ID already exists.",
+        details=None,
+        task=None,
+    ):
+        super().__init__(message, details, task)
+
+
+class TaskNotFoundError(TaskError):
+    """Exception raised when a Task is not found."""
+
+    def __init__(
+        self,
+        message="The specified Task was not found.",
+        details=None,
+        task=None,
+    ):
+        super().__init__(message, details, task)
+
+
 class ConversationError(AgentServiceError):
     """Base exception class for Conversation errors."""
 
@@ -89,3 +126,26 @@ class ConversationNotFoundError(ConversationError):
         conversation=None,
     ):
         super().__init__(message, details, conversation)
+
+
+class ConversationNotAvailableError(ConversationError):
+    """Exception raised when a Conversation is not available."""
+
+    def __init__(
+        self,
+        message="The specified Conversation is not available.",
+        details=None,
+        conversation=None,
+    ):
+        super().__init__(message, details, conversation)
+
+
+class InvalidRequestError(AgentServiceError):
+    """Exception raised when an invalid request is made."""
+
+    def __init__(
+        self,
+        message="The request is invalid.",
+        details=None,
+    ):
+        super().__init__(message, details)
