@@ -1,7 +1,7 @@
 from roster_agent_runtime.executors.base import AgentExecutor
 from roster_agent_runtime.models.agent import AgentResource
 from roster_agent_runtime.models.conversation import (
-    ConversationPrompt,
+    ConversationMessage,
     ConversationResource,
 )
 from roster_agent_runtime.models.task import TaskResource
@@ -19,7 +19,7 @@ class LocalAgentService(AgentService):
     async def create_agent(self, agent: AgentResource) -> AgentResource:
         if agent.name in self.agents:
             raise errors.AgentAlreadyExistsError(agent=agent.name)
-        self.agents[agent.name] = self.executor.create_agent(agent)
+        self.agents[agent.name] = await self.executor.create_agent(agent)
         return self.agents[agent.name]
 
     async def list_agents(self) -> list[AgentResource]:
@@ -37,7 +37,7 @@ class LocalAgentService(AgentService):
         except KeyError as e:
             raise errors.AgentNotFoundError(agent=name) from e
 
-        return self.executor.delete_agent(agent)
+        return await self.executor.delete_agent(agent)
 
     async def initiate_task(self, task: TaskResource) -> TaskResource:
         """if the agent exists, use the AgentResource to run a container for the task"""
@@ -46,7 +46,7 @@ class LocalAgentService(AgentService):
         if task.agent_name not in self.agents:
             raise errors.AgentNotFoundError(agent=task.agent_name)
 
-        return self.executor.initiate_task(task)
+        return await self.executor.initiate_task(task)
 
     async def start_conversation(
         self, conversation: ConversationResource
@@ -62,20 +62,18 @@ class LocalAgentService(AgentService):
         return conversation
 
     async def prompt(
-        self, conversation_id: str, conversation_prompt: ConversationPrompt
+        self, conversation_id: str, conversation_message: ConversationMessage
     ) -> ConversationResource:
         try:
             conversation = self.conversations[conversation_id]
         except KeyError as e:
             raise errors.ConversationNotFoundError(conversation=conversation_id) from e
-        if conversation.agent_name != conversation_prompt.agent_name:
-            raise errors.InvalidRequestError("Conversation and prompt agent mismatch.")
         if conversation.agent_name not in self.agents:
             raise errors.AgentNotFoundError(agent=conversation.agent_name)
         if conversation.status != "running":
             raise errors.ConversationNotAvailableError(conversation=conversation_id)
 
-        return self.executor.prompt(conversation, conversation_prompt)
+        return await self.executor.prompt(conversation, conversation_message)
 
     async def end_conversation(self, conversation_id: str) -> ConversationResource:
         try:

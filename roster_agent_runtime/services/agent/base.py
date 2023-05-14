@@ -3,7 +3,7 @@ from typing import Optional
 
 from roster_agent_runtime.models.agent import AgentResource
 from roster_agent_runtime.models.conversation import (
-    ConversationPrompt,
+    ConversationMessage,
     ConversationResource,
 )
 from roster_agent_runtime.models.task import TaskResource
@@ -54,7 +54,7 @@ class AgentService(ABC):
 
     @abstractmethod
     async def prompt(
-        self, conversation_id: str, conversation_prompt: ConversationPrompt
+        self, conversation_id: str, conversation_message: ConversationMessage
     ) -> ConversationResource:
         """prompt agent in conversation"""
 

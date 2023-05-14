@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, responses, status
 from roster_agent_runtime.api.routes import create_error_handling_route
 from roster_agent_runtime.models.agent import AgentResource
 from roster_agent_runtime.models.conversation import (
-    ConversationPrompt,
+    ConversationMessage,
     ConversationResource,
 )
 from roster_agent_runtime.models.task import TaskResource
@@ -69,10 +69,10 @@ async def start_conversation(
 )
 async def prompt(
     conversation_id: str,
-    conversation_prompt: ConversationPrompt,
+    conversation_message: ConversationMessage,
     agent_service: AgentService = Depends(get_agent_service),
 ):
-    return await agent_service.prompt(conversation_id, conversation_prompt)
+    return await agent_service.prompt(conversation_id, conversation_message)
 
 
 @router.post(

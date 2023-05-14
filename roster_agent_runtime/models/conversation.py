@@ -46,21 +46,3 @@ class ConversationResource(BaseModel):
                 "container": AgentContainer.Config.schema_extra["example"],
             }
         }
-
-
-# TODO: implement 'marker' IDs after each message in a conversation
-#   to support branching, re-prompting etc.
-class ConversationPrompt(BaseModel):
-    agent_name: str = Field(description="The name of the agent.")
-    conversation_id: str = Field(description="The id of the conversation.")
-    message: ConversationMessage = Field(description="The prompt message.")
-
-    class Config:
-        validate_assignment = True
-        schema_extra = {
-            "example": {
-                "agent_name": "Alice",
-                "conversation_id": "my_conversation_id",
-                "message": ConversationMessage.Config.schema_extra["example"],
-            }
-        }
