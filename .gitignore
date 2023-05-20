@@ -21,6 +21,9 @@ build/
 *.swp
 *~
 
+# Ad-hoc testing files
+test.py
+
 # Environment config
 .env
 

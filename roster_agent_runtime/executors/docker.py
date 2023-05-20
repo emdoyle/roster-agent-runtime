@@ -1,13 +1,18 @@
-import asyncio
 import json
 import os
 import platform
-from typing import Callable
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from typing import Callable, Optional
 
 import aiohttp
+import requests
 from pydantic import BaseModel
 from roster_agent_runtime.executors.base import AgentExecutor
 from roster_agent_runtime.informers.base import Informer
+from roster_agent_runtime.informers.docker import (
+    DEFAULT_EVENT_FILTERS,
+    DockerEventsInformer,
+)
 from roster_agent_runtime.models.agent import (
     AgentCapabilities,
     AgentContainer,
@@ -74,9 +79,6 @@ def parse_task_status_line(line: str) -> TaskStatus:
     return task_status
 
 
-task_informer_middleware = [parse_task_status_line]
-
-
 class RunningAgent(BaseModel):
     status: AgentStatus
     tasks: dict[str, TaskStatus] = {}
@@ -85,12 +87,32 @@ class RunningAgent(BaseModel):
 # TODO: make docker client operations async
 class DockerAgentExecutor(AgentExecutor):
     ROSTER_CONTAINER_LABEL = "roster-agent"
+    task_informer_middleware = [parse_task_status_line]
 
     def __init__(self):
         try:
             self.client = docker.from_env()
             self.agents: dict[str, RunningAgent] = {}
+
+            # This informer allows us to listen for changes to
+            # container status in the Docker environment.
+            self.docker_events_informer = DockerEventsInformer(
+                filters={"label": self.ROSTER_CONTAINER_LABEL, **DEFAULT_EVENT_FILTERS},
+                handlers=[self._handle_docker_event],
+            )
+            self.docker_events_informer.run_as_task()
+
+            # These informers allow us to listen for changes to
+            # task status within an Agent container.
             self.informers: dict[str, Informer] = {}
+
+            # These listeners allow us to notify the agent service
+            # of changes to agent and task status.
+            self.agent_status_listeners: list[Callable] = []
+            self.task_status_listeners: list[Callable] = []
+
+            # This populates our agents dict with the current state
+            # from the Docker environment.
             self.restore_state()
         except docker.errors.DockerException as e:
             raise errors.AgentServiceError("Could not connect to Docker daemon.") from e
@@ -126,23 +148,19 @@ class DockerAgentExecutor(AgentExecutor):
                 f"Could not determine host port for agent {name}."
             )
 
-    async def _fetch_task_status_for_agent(
-        self, agent_name: str, session: aiohttp.ClientSession
-    ) -> list[TaskStatus]:
+    def _fetch_task_status_for_agent(self, agent_name: str) -> list[TaskStatus]:
         try:
             url = (
                 f"http://localhost:{self._get_service_port_for_agent(agent_name)}/tasks"
             )
-            async with session.get(url, raise_for_status=True) as response:
-                try:
-                    response = await response.json()
-                    return [
-                        TaskStatus(**task_status) for task_status in response["tasks"]
-                    ]
-                except (TypeError, KeyError, aiohttp.ContentTypeError) as e:
-                    raise errors.AgentServiceError(
-                        f"Could not parse response from agent {agent_name}."
-                    ) from e
+            response = requests.get(url)
+            try:
+                response = response.json()
+                return [TaskStatus(**task_status) for task_status in response["tasks"]]
+            except (TypeError, KeyError, aiohttp.ContentTypeError) as e:
+                raise errors.AgentServiceError(
+                    f"Could not parse response from agent {agent_name}."
+                ) from e
         except (aiohttp.ClientError, errors.AgentServiceError):
             return []
 
@@ -174,23 +192,18 @@ class DockerAgentExecutor(AgentExecutor):
 
     def _restore_task_state(self):
         agent_names = list(self.agents.keys())
-        loop = asyncio.get_event_loop()
-        session = aiohttp.ClientSession()
-        try:
-            tasks = loop.run_until_complete(
-                asyncio.gather(
-                    *[
-                        self._fetch_task_status_for_agent(name, session)
-                        for name in agent_names
-                    ]
-                )
-            )
-            for name, task_statuses in zip(agent_names, tasks):
+        with ThreadPoolExecutor() as executor:
+            tasks: list[Future] = [
+                executor.submit(self._fetch_task_status_for_agent, name)
+                for name in agent_names
+            ]
+            for name, task_statuses in zip(agent_names, as_completed(tasks)):
                 self.agents[name].tasks.update(
-                    {task_status.name: task_status for task_status in task_statuses}
+                    {
+                        task_status.name: task_status
+                        for task_status in task_statuses.result()
+                    }
                 )
-        finally:
-            loop.run_until_complete(session.close())
 
     def restore_state(self):
         self._restore_agent_state()
@@ -246,7 +259,7 @@ class DockerAgentExecutor(AgentExecutor):
 
         # TODO: figure out how to wait for agent server to be ready
 
-        self.agents[agent.name] = self._add_agent_from_container(container)
+        self._add_agent_from_container(container)
         return self.agents[agent.name].status
 
     async def update_agent(self, agent: AgentSpec) -> AgentStatus:
@@ -267,7 +280,7 @@ class DockerAgentExecutor(AgentExecutor):
 
         try:
             self.informers.pop(agent.name).cancel()
-        except RuntimeError:
+        except (KeyError, RuntimeError):
             # NOTE: informer was not started
             #   should log warning here
             pass
@@ -292,10 +305,16 @@ class DockerAgentExecutor(AgentExecutor):
         def handler(task: TaskStatus) -> None:
             try:
                 self.agents[agent_name].tasks[task.name] = task
+                for listener in self.task_status_listeners:
+                    listener(task)
             except KeyError:
                 # should probably just log an error instead of breaking
                 # the informer
                 raise errors.AgentNotFoundError(agent=agent_name)
+            except Exception:
+                # this is likely a listener error
+                # should probably log an error here
+                pass
 
         return handler
 
@@ -326,7 +345,7 @@ class DockerAgentExecutor(AgentExecutor):
         if task.agent_name not in self.informers:
             self.informers[task.agent_name] = Informer(
                 url=f"http://localhost:{port}/task_events",
-                middleware=task_informer_middleware,
+                middleware=self.task_informer_middleware,
                 handlers=[self._task_event_handler(task.agent_name)],
             )
             self.informers[task.agent_name].run_as_task()
@@ -364,3 +383,42 @@ class DockerAgentExecutor(AgentExecutor):
                 ) from e
 
         return conversation_message
+
+    def _find_agent_by_container_name(
+        self, container_name: str
+    ) -> Optional[RunningAgent]:
+        for agent in self.agents.values():
+            if (
+                agent.status.container is not None
+                and agent.status.container.name == container_name
+            ):
+                return agent
+
+    async def _handle_docker_event(self, event: dict):
+        if event["Type"] != "container":
+            return
+
+        if event["Action"] not in ["start", "stop", "die", "destroy"]:
+            return
+
+        try:
+            container_name = event["Actor"]["Attributes"]["name"]
+            agent = self._find_agent_by_container_name(container_name)
+            container = self.client.containers.get(container_name)
+        except (KeyError, docker.errors.NotFound):
+            return
+
+        if agent is None:
+            return
+
+        agent.status.container = serialize_agent_container(container)
+        agent.status.status = container.status
+
+        for listener in self.agent_status_listeners:
+            listener(agent.status)
+
+    def add_agent_status_listener(self, listener: Callable):
+        self.agent_status_listeners.append(listener)
+
+    def add_task_status_listener(self, listener: Callable):
+        self.task_status_listeners.append(listener)

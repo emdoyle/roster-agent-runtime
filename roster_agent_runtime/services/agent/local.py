@@ -15,9 +15,26 @@ class LocalAgentService(AgentService):
     def __init__(self, executor: AgentExecutor):
         # TODO: properly abstract executor per-Agent
         self.executor = executor
+        self.setup_status_listeners()
         self.agents: dict[str, AgentResource] = {}
         self.tasks: dict[str, TaskResource] = {}
         self.conversations: dict[str, ConversationResource] = {}
+
+    def _task_status_listener(self, task: TaskStatus):
+        try:
+            self.tasks[task.name].status = task
+        except KeyError:
+            pass
+
+    def _agent_status_listener(self, agent: AgentStatus):
+        try:
+            self.agents[agent.name].status = agent
+        except KeyError:
+            pass
+
+    def setup_status_listeners(self):
+        self.executor.add_task_status_listener(self._task_status_listener)
+        self.executor.add_agent_status_listener(self._agent_status_listener)
 
     async def create_agent(self, agent: AgentSpec) -> AgentStatus:
         if agent.name in self.agents:

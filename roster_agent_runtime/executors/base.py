@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Callable
 
 from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
 from roster_agent_runtime.models.conversation import (
@@ -40,3 +41,11 @@ class AgentExecutor(ABC):
     @abstractmethod
     async def delete_agent(self, agent: AgentSpec) -> None:
         """delete agent"""
+
+    @abstractmethod
+    def add_agent_status_listener(self, listener: Callable):
+        """add listener to agent status"""
+
+    @abstractmethod
+    def add_task_status_listener(self, listener: Callable):
+        """add listener to task status"""
