@@ -2,8 +2,6 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from .agent import AgentContainer
-
 
 class ConversationMessage(BaseModel):
     message: str = Field(description="The message.")
@@ -19,17 +17,11 @@ class ConversationMessage(BaseModel):
         }
 
 
-class ConversationResource(BaseModel):
+class ConversationSpec(BaseModel):
     agent_name: str = Field(description="The name of the agent.")
-    history: list[ConversationMessage] = Field(
-        default_factory=list, description="The conversation history."
-    )
-    id: str = Field(description="The id of the conversation.")
     name: str = Field(description="The name of the conversation.")
-    status: str = Field(description="The status of the conversation.")
-    container: Optional[AgentContainer] = Field(
-        default=None,
-        description="The running container of the agent holding the conversation.",
+    context: Optional[dict] = Field(
+        default=None, description="The context of the conversation."
     )
 
     class Config:
@@ -37,12 +29,41 @@ class ConversationResource(BaseModel):
         schema_extra = {
             "example": {
                 "agent_name": "Alice",
+                "name": "my_conversation",
+                "context": {"task": "my_task"},
+            }
+        }
+
+
+class ConversationStatus(BaseModel):
+    name: str = Field(description="The name of the conversation.")
+    status: str = Field(description="The status of the conversation.")
+    history: list[ConversationMessage] = Field(
+        default_factory=list, description="The conversation history."
+    )
+
+    class Config:
+        validate_assignment = True
+        schema_extra = {
+            "example": {
+                "name": "my_conversation",
+                "status": "in_progress",
                 "history": [
                     ConversationMessage.Config.schema_extra["example"],
                 ],
-                "id": "my_conversation_id",
-                "name": "my_conversation",
-                "status": "in_progress",
-                "container": AgentContainer.Config.schema_extra["example"],
+            }
+        }
+
+
+class ConversationResource(BaseModel):
+    spec: ConversationSpec = Field(description="The specification of the conversation.")
+    status: ConversationStatus = Field(description="The status of the conversation.")
+
+    class Config:
+        validate_assignment = True
+        schema_extra = {
+            "example": {
+                "spec": ConversationSpec.Config.schema_extra["example"],
+                "status": ConversationStatus.Config.schema_extra["example"],
             }
         }

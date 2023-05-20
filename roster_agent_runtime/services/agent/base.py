@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from roster_agent_runtime.models.agent import AgentResource
+from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
 from roster_agent_runtime.models.conversation import (
     ConversationMessage,
-    ConversationResource,
+    ConversationSpec,
+    ConversationStatus,
 )
-from roster_agent_runtime.models.task import TaskResource
+from roster_agent_runtime.models.task import TaskSpec, TaskStatus
 
 AGENT_SERVICE: Optional["AgentService"] = None
 
@@ -27,37 +28,41 @@ def get_agent_service() -> "AgentService":
 
 class AgentService(ABC):
     @abstractmethod
-    async def create_agent(self, agent: AgentResource) -> AgentResource:
+    async def create_agent(self, agent: AgentSpec) -> AgentStatus:
         """create agent"""
 
     @abstractmethod
-    async def list_agents(self) -> list[AgentResource]:
+    async def update_agent(self, agent: AgentSpec) -> AgentStatus:
+        """update agent"""
+
+    @abstractmethod
+    async def list_agents(self) -> list[AgentStatus]:
         """list agents"""
 
     @abstractmethod
-    async def get_agent(self, name: str) -> AgentResource:
+    async def get_agent(self, name: str) -> AgentStatus:
         """get agent by name"""
 
     @abstractmethod
-    async def delete_agent(self, name: str) -> AgentResource:
+    async def delete_agent(self, name: str) -> None:
         """delete agent by name"""
 
     @abstractmethod
-    async def initiate_task(self, task: TaskResource) -> TaskResource:
+    async def initiate_task(self, task: TaskSpec) -> TaskStatus:
         """start task"""
 
     @abstractmethod
     async def start_conversation(
-        self, conversation: ConversationResource
-    ) -> ConversationResource:
+        self, conversation: ConversationSpec
+    ) -> ConversationStatus:
         """start conversation"""
 
     @abstractmethod
     async def prompt(
-        self, conversation_id: str, conversation_message: ConversationMessage
-    ) -> ConversationResource:
-        """prompt agent in conversation"""
+        self, name: str, conversation_message: ConversationMessage
+    ) -> ConversationStatus:
+        """send message in conversation"""
 
     @abstractmethod
-    async def end_conversation(self, conversation_id: str) -> ConversationResource:
+    async def end_conversation(self, name: str) -> None:
         """end conversation"""
