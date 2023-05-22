@@ -124,6 +124,8 @@ class AgentController:
                 or agent.container.image.split(":")[0] == spec.image
             )
             return image_matches and agent.container.capabilities == spec.capabilities
+        # Should probably raise if there is no container
+        # but this implies reconsidering whether it is optional
         return True
 
     async def reconcile_agents(self):
@@ -150,6 +152,10 @@ class AgentController:
     async def reconcile_tasks(self):
         updated_tasks = {}
         for name, spec in self.desired.tasks.items():
+            if spec.agent_name not in self.current.agents:
+                # spec is invalid, or we haven't reconciled agents -> skip
+                # should also log warning
+                continue
             if name not in self.current.tasks:
                 await self.initiate_task(spec)
             elif not self.task_matches_spec(self.current.tasks[name], spec):
@@ -183,8 +189,12 @@ class AgentController:
 
     async def delete_agent(self, name: str) -> None:
         try:
-            # should remove all tasks associated with this agent
             self.current.agents.pop(name)
+            self.current.tasks = {
+                task_name: task
+                for task_name, task in self.current.tasks.items()
+                if task.agent_name != name
+            }
         except KeyError as e:
             raise errors.AgentNotFoundError(agent=name) from e
 

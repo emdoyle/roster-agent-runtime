@@ -1,8 +1,9 @@
 from typing import Callable, Union
 
+from roster_agent_runtime import settings
 from roster_agent_runtime.informers.base import Informer
 from roster_agent_runtime.listeners.base import EventListener
-from roster_agent_runtime.models.agent import AgentCapabilities, AgentSpec
+from roster_agent_runtime.models.agent import AgentSpec
 from roster_agent_runtime.models.conversation import ConversationSpec
 from roster_agent_runtime.models.task import TaskSpec
 
@@ -10,13 +11,11 @@ RosterSpec = Union[AgentSpec, TaskSpec, ConversationSpec]
 
 
 class RosterInformer(Informer[RosterSpec]):
-    def __init__(self):
+    def __init__(self, api_url: str = settings.ROSTER_API_EVENTS_URL):
         self.agents: dict[str, AgentSpec] = {}
         self.tasks: dict[str, TaskSpec] = {}
         self.conversations: dict[str, ConversationSpec] = {}
-        self.roster_listener: EventListener = EventListener(
-            "TODO: roster API server URL"
-        )
+        self.roster_listener: EventListener = EventListener(api_url)
         self.event_listeners: list[Callable[[RosterSpec], None]] = []
 
     async def setup(self):

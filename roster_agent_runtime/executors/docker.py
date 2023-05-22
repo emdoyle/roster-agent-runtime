@@ -19,10 +19,7 @@ from roster_agent_runtime.models.agent import (
     AgentSpec,
     AgentStatus,
 )
-from roster_agent_runtime.models.conversation import (
-    ConversationMessage,
-    ConversationResource,
-)
+from roster_agent_runtime.models.conversation import ConversationMessage
 from roster_agent_runtime.models.task import TaskSpec, TaskStatus
 
 import docker
@@ -83,6 +80,7 @@ class RunningAgent(BaseModel):
     tasks: dict[str, TaskStatus] = {}
 
 
+# TODO: lots of methods probably need to be transactional
 # TODO: make docker client operations async
 class DockerAgentExecutor(AgentExecutor):
     ROSTER_CONTAINER_LABEL = "roster-agent"
@@ -276,8 +274,9 @@ class DockerAgentExecutor(AgentExecutor):
 
     async def delete_agent(self, name: str) -> None:
         try:
-            # should remove all tasks associated with this agent
             running_agent = self.agents.pop(name)
+            for task in running_agent.tasks.values():
+                self.tasks.pop(task.name, None)
         except KeyError:
             raise errors.AgentNotFoundError(agent=name)
 
