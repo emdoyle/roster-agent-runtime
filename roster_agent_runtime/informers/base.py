@@ -1,48 +1,26 @@
-import asyncio
-from typing import Callable, Optional
+from abc import ABC, abstractmethod
+from typing import Callable, Generic, TypeVar
 
-import aiohttp
+T = TypeVar("T")
 
 
-class Informer:
-    def __init__(
-        self,
-        url: str,
-        middleware: Optional[list[Callable]] = None,
-        handlers: Optional[list[Callable]] = None,
-    ):
-        self.url = url
-        self.middleware = middleware or []
-        self.handlers = handlers or []
-        # NOTE: This means an Informer instance should only be used once
-        self.task = None
+# NOTE: probably need to reconcile the concept of an 'Event' with 'Object'
+#   Events are things that happen, Objects are things that exist
 
-    async def watch(self):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.url) as resp:
-                async for line in resp.content:
-                    if line == b"\n":
-                        continue
-                    for handler in self.handlers:
-                        line = line.decode("utf-8")
-                        for middleware in self.middleware:
-                            line = await middleware(line)
-                        await handler(line)
 
-    def run_as_task(self) -> asyncio.Task:
-        if self.task is not None:
-            raise RuntimeError("Informer task already exists")
-        loop = asyncio.get_event_loop()
-        self.task = loop.create_task(self.watch())
-        return self.task
+class Informer(ABC, Generic[T]):
+    @abstractmethod
+    async def setup(self):
+        """setup informer -- called once on startup to establish listeners on remote data source"""
 
-    def cancel(self):
-        if self.task is None:
-            raise RuntimeError("Informer task does not exist")
-        self.task.stop()
+    @abstractmethod
+    async def add_event_listener(self, callback: Callable[[T], None]):
+        """add callback to be called when informer receives an object"""
 
-    def add_middleware(self, middleware: Callable):
-        self.middleware.append(middleware)
+    @abstractmethod
+    def list(self) -> list[T]:
+        """list all objects"""
 
-    def add_handler(self, handler: Callable):
-        self.handlers.append(handler)
+    @abstractmethod
+    def get(self, id: str) -> T:
+        """get object"""

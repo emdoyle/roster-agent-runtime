@@ -11,7 +11,7 @@ DEFAULT_EVENT_FILTERS = {
 }
 
 
-class DockerEventsInformer:
+class DockerEventListener:
     def __init__(
         self,
         filters: Optional[dict] = None,
@@ -21,13 +21,13 @@ class DockerEventsInformer:
         self.filters = filters or DEFAULT_EVENT_FILTERS
         self.middleware = middleware or []
         self.handlers = handlers or []
-        # NOTE: This means an Informer instance should only be used once
+        # NOTE: This means an instance should only be used once
         self.task = None
         self.json_stream = None
 
-    async def watch(self):
+    async def listen(self):
         if self.json_stream is not None:
-            raise RuntimeError("DockerInformer already watching events")
+            raise RuntimeError("DockerEventListener already listening for events")
         async with aiohttp.ClientSession(
             connector=aiohttp.UnixConnector(path="/var/run/docker.sock")
         ) as session:
@@ -51,7 +51,7 @@ class DockerEventsInformer:
         if self.task is not None:
             raise RuntimeError("Informer task already exists")
         loop = asyncio.get_event_loop()
-        self.task = loop.create_task(self.watch())
+        self.task = loop.create_task(self.listen())
         return self.task
 
     def stop(self):
