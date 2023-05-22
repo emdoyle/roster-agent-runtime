@@ -55,8 +55,6 @@ class DockerEventListener:
         return self.task
 
     def stop(self):
-        if self.json_stream is not None:
-            self.json_stream.close()
         if self.task is not None:
             self.task.cancel()
             self.task = None

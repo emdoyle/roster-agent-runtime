@@ -45,12 +45,24 @@ class AgentController:
         return self.state.current
 
     async def setup(self):
-        await asyncio.gather(
-            self.setup_roster_connection(), self.setup_executor_connection()
-        )
-        print("Connections established.\nReconciling...")
-        await self.reconcile()
-        print("Reconciled.")
+        try:
+            await asyncio.gather(
+                self.setup_roster_connection(), self.setup_executor_connection()
+            )
+            print("Connections established.\nReconciling...")
+            await self.reconcile()
+            print("Reconciled.")
+        except Exception as e:
+            await self.teardown()
+            raise errors.SetupError from e
+
+    async def teardown(self):
+        try:
+            await asyncio.gather(
+                self.roster_informer.teardown(), self.executor.teardown()
+            )
+        except Exception as e:
+            raise errors.TeardownError from e
 
     async def setup_roster_connection(self):
         # Setup Informer for Roster API resources (desired state)

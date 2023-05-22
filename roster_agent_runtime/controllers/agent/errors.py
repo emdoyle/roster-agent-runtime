@@ -149,3 +149,25 @@ class InvalidRequestError(AgentServiceError):
         details=None,
     ):
         super().__init__(message, details)
+
+
+class SetupError(AgentServiceError):
+    """Exception raised when an error occurs during set up."""
+
+    def __init__(
+        self,
+        message="An error occurred when attempting to set up.",
+        details=None,
+    ):
+        super().__init__(message, details)
+
+
+class TeardownError(AgentServiceError):
+    """Exception raised when an error occurs during tear down."""
+
+    def __init__(
+        self,
+        message="An error occurred when attempting to tear down.",
+        details=None,
+    ):
+        super().__init__(message, details)

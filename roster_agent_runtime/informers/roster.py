@@ -3,7 +3,7 @@ from typing import Callable, Union
 from roster_agent_runtime import settings
 from roster_agent_runtime.informers.base import Informer
 from roster_agent_runtime.listeners.base import EventListener
-from roster_agent_runtime.models.agent import AgentSpec
+from roster_agent_runtime.models.agent import AgentCapabilities, AgentSpec
 from roster_agent_runtime.models.conversation import ConversationSpec
 from roster_agent_runtime.models.task import TaskSpec
 
@@ -21,20 +21,22 @@ class RosterInformer(Informer[RosterSpec]):
     async def setup(self):
         # TODO: connect to roster API server via roster_listener
         # For now, using mock data
-        # self.agents = {
-        #     "Alice": AgentSpec(
-        #         image="langchain-roster",
-        #         name="Alice",
-        #         capabilities=AgentCapabilities(network_access=True),
-        #     )
-        # }
-        # self.tasks = {
-        #     "MyTask": TaskSpec(
-        #         agent_name="Alice",
-        #         name="MyTask",
-        #         description="My task description",
-        #     )
-        # }
+        self.agents = {
+            "Alice": AgentSpec(
+                image="langchain-roster",
+                name="Alice",
+                capabilities=AgentCapabilities(network_access=True),
+            )
+        }
+        self.tasks = {
+            "MyTask": TaskSpec(
+                agent_name="Alice",
+                name="MyTask",
+                description="My task description",
+            )
+        }
+
+    async def teardown(self):
         pass
 
     def add_event_listener(self, callback: Callable[[RosterSpec], None]):

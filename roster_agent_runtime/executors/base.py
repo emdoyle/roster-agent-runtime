@@ -12,6 +12,10 @@ class AgentExecutor(ABC):
         """setup executor -- called once on startup to load status from environment"""
 
     @abstractmethod
+    async def teardown(self):
+        """teardown executor -- called once on shutdown to clean up resources"""
+
+    @abstractmethod
     def list_agents(self) -> list[AgentStatus]:
         """list agents"""
 

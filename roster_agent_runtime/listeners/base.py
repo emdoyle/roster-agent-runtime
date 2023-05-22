@@ -36,7 +36,7 @@ class EventListener:
         self.task = loop.create_task(self.listen())
         return self.task
 
-    def cancel(self):
+    def stop(self):
         if self.task is None:
             raise RuntimeError("Informer task does not exist")
         self.task.stop()

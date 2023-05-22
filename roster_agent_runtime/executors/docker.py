@@ -58,7 +58,7 @@ def serialize_agent_container(
     return AgentContainer(
         id=container.id,
         name=container.name,
-        image=container.image.tags[0],
+        image=container.image.tags[0] if container.image.tags else "UNKNOWN",
         status=container.status,
         labels=container.labels,
         capabilities=capabilities,
@@ -93,16 +93,15 @@ class DockerAgentExecutor(AgentExecutor):
             # This is for convenient access without an agent name
             self.tasks: dict[str, TaskStatus] = {}
 
-            # This informer allows us to listen for changes to
+            # This allows us to listen for changes to
             # container status in the Docker environment.
-            self.docker_events_informer = DockerEventListener(
+            self.docker_events_listener = DockerEventListener(
                 filters={"label": self.ROSTER_CONTAINER_LABEL, **DEFAULT_EVENT_FILTERS},
                 handlers=[self._handle_docker_event],
             )
-            # TODO: cleaner task management
-            self.docker_events_informer.run_as_task()
+            self.docker_events_listener.run_as_task()
 
-            # These informers allow us to listen for changes to
+            # These listeners allow us to listen for changes to
             # task status within an Agent container.
             self.task_listeners: dict[str, EventListener] = {}
 
@@ -209,6 +208,11 @@ class DockerAgentExecutor(AgentExecutor):
     async def setup(self):
         await asyncio.gather(self._restore_agent_state(), self._restore_task_state())
 
+    async def teardown(self):
+        self.docker_events_listener.stop()
+        for task_listener in self.task_listeners.values():
+            task_listener.stop()
+
     def list_agents(self) -> list[AgentStatus]:
         return [agent.status for agent in self.agents.values()]
 
@@ -218,7 +222,26 @@ class DockerAgentExecutor(AgentExecutor):
         except KeyError:
             raise errors.AgentNotFoundError(agent=name)
 
-    async def create_agent(self, agent: AgentSpec) -> AgentStatus:
+    async def _wait_for_agent_healthy(
+        self, agent_name: str, max_retries: int = 20, interval: float = 0.5
+    ):
+        for i in range(max_retries):
+            print(f"{i} Checking agent is healthy...")
+            try:
+                port = self._get_service_port_for_agent(agent_name)
+                url = f"http://localhost:{port}/healthcheck"
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as response:
+                        if response.status == 200:
+                            return
+            except (aiohttp.ClientError, errors.AgentNotFoundError):
+                pass
+            await asyncio.sleep(interval)
+
+    async def create_agent(
+        self, agent: AgentSpec, wait_for_healthy: bool = True
+    ) -> AgentStatus:
         if agent.name in self.agents:
             raise errors.AgentAlreadyExistsError(agent=agent.name)
 
@@ -257,9 +280,10 @@ class DockerAgentExecutor(AgentExecutor):
                 f"Could not create agent {agent.name}."
             ) from e
 
-        # TODO: figure out how to wait for agent server to be ready
-
         self._add_agent_from_container(container)
+        if wait_for_healthy:
+            await self._wait_for_agent_healthy(agent.name)
+
         return self.agents[agent.name].status
 
     async def update_agent(self, agent: AgentSpec) -> AgentStatus:
@@ -281,9 +305,9 @@ class DockerAgentExecutor(AgentExecutor):
             raise errors.AgentNotFoundError(agent=name)
 
         try:
-            self.task_listeners.pop(name).cancel()
+            self.task_listeners.pop(name).stop()
         except (KeyError, RuntimeError):
-            # NOTE: informer was not started
+            # NOTE: listener was not started
             #   should log warning here
             pass
 
