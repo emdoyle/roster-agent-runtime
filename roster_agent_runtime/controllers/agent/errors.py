@@ -18,6 +18,19 @@ class CreateAgentError(AgentServiceError):
         super().__init__(message, details)
 
 
+class AgentFailedToStartError(CreateAgentError):
+    """Exception raised when an Agent fails to start."""
+
+    def __init__(
+        self,
+        message="The Agent failed to start.",
+        details=None,
+        agent=None,
+    ):
+        super().__init__(message, details)
+        self.agent = agent
+
+
 class AgentAlreadyExistsError(CreateAgentError):
     """Exception raised when an Agent already exists."""
 

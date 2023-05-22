@@ -8,6 +8,7 @@ import aiohttp
 from pydantic import BaseModel
 from roster_agent_runtime.controllers.agent import errors
 from roster_agent_runtime.executors.base import AgentExecutor
+from roster_agent_runtime.executors.events import EventType, Resource, StatusEvent
 from roster_agent_runtime.listeners.base import EventListener
 from roster_agent_runtime.listeners.docker import (
     DEFAULT_EVENT_FILTERS,
@@ -105,10 +106,10 @@ class DockerAgentExecutor(AgentExecutor):
             # task status within an Agent container.
             self.task_listeners: dict[str, EventListener] = {}
 
-            # These listeners allow us to notify the agent service
+            # These listeners allow us to notify the agent controller
             # of changes to agent and task status.
-            self.agent_status_listeners: list[Callable] = []
-            self.task_status_listeners: list[Callable] = []
+            self.agent_status_listeners: list[Callable[[StatusEvent], None]] = []
+            self.task_status_listeners: list[Callable[[StatusEvent], None]] = []
         except docker.errors.DockerException as e:
             raise errors.AgentServiceError("Could not connect to Docker daemon.") from e
 
@@ -238,6 +239,27 @@ class DockerAgentExecutor(AgentExecutor):
             except (aiohttp.ClientError, errors.AgentNotFoundError):
                 pass
             await asyncio.sleep(interval)
+        raise errors.AgentFailedToStartError(
+            "Agent healthcheck did not succeed.", agent=agent_name
+        )
+
+    def setup_task_listener_for_agent(self, agent_name: str):
+        if agent_name in self.task_listeners:
+            raise errors.AgentAlreadyExistsError(agent=agent_name)
+
+        try:
+            port = self._get_service_port_for_agent(agent_name)
+            self.task_listeners[agent_name] = EventListener(
+                url=f"http://localhost:{port}/task_events",
+                middleware=self.task_informer_middleware,
+                handlers=[self._task_event_handler(agent_name)],
+            )
+            self.task_listeners[agent_name].run_as_task()
+        except errors.AgentNotFoundError as e:
+            raise errors.AgentFailedToStartError(
+                f"Could not connect to /task_events for Agent.",
+                agent=agent_name,
+            ) from e
 
     async def create_agent(
         self, agent: AgentSpec, wait_for_healthy: bool = True
@@ -283,6 +305,8 @@ class DockerAgentExecutor(AgentExecutor):
         self._add_agent_from_container(container)
         if wait_for_healthy:
             await self._wait_for_agent_healthy(agent.name)
+
+        self.setup_task_listener_for_agent(agent.name)
 
         return self.agents[agent.name].status
 
@@ -330,7 +354,13 @@ class DockerAgentExecutor(AgentExecutor):
             try:
                 self._store_task(agent_name, task)
                 for listener in self.task_status_listeners:
-                    listener(task)
+                    listener(
+                        StatusEvent(
+                            resource_type=Resource.TASK,
+                            event_type=EventType.UPDATE,
+                            data=task,
+                        )
+                    )
             except KeyError:
                 # should probably just log an error instead of breaking
                 # the informer
@@ -370,17 +400,6 @@ class DockerAgentExecutor(AgentExecutor):
                     f"Could not initiate task {task.name}."
                 ) from e
 
-        if task.agent_name not in self.task_listeners:
-            # TODO: figure out how to wait for agent server to be ready
-            #   and start this instead from create_agent
-            #   - this is essentially lazy loading (so maybe keep it?)
-            self.task_listeners[task.agent_name] = EventListener(
-                url=f"http://localhost:{port}/task_events",
-                middleware=self.task_informer_middleware,
-                handlers=[self._task_event_handler(task.agent_name)],
-            )
-            self.task_listeners[task.agent_name].run_as_task()
-
         return task_status
 
     async def update_task(self, task: TaskSpec) -> TaskStatus:
@@ -401,8 +420,10 @@ class DockerAgentExecutor(AgentExecutor):
             raise errors.TaskNotFoundError(task=task.name)
 
     async def end_task(self, name: str) -> None:
-        task = self.tasks.get(name)
-        if not task:
+        try:
+            task = self.tasks.pop(name)
+            self.agents[task.agent_name].tasks.pop(name)
+        except KeyError:
             raise errors.TaskNotFoundError(task=name)
         port = self._get_service_port_for_agent(task.agent_name)
         url = f"http://localhost:{port}/task"
@@ -461,28 +482,116 @@ class DockerAgentExecutor(AgentExecutor):
             ):
                 return agent
 
+    def _handle_docker_start_event(self, event: dict) -> Optional[StatusEvent]:
+        try:
+            agent_name = event["Actor"]["Attributes"]["Config"]["Labels"][
+                self.ROSTER_CONTAINER_LABEL
+            ]
+            container_name = event["Actor"]["Attributes"]["name"]
+            container = self.client.containers.get(container_name)
+        except (KeyError, docker.errors.NotFound):
+            return None
+
+        existing_container = self.agents[agent_name].status.container
+        should_remove = (
+            existing_container is not None and existing_container.name != container_name
+        )
+        if agent_name in self.agents and should_remove:
+            # Agent already exists, and this container is not the agent container,
+            # so we should remove it.
+            try:
+                container.stop()
+                container.remove()
+            except docker.errors.NotFound:
+                pass
+            return None
+        elif agent_name in self.agents:
+            # This would be from starting the agent ourselves
+            return None
+
+        # Otherwise, we should update the agent status and notify listeners.
+        self.agents[agent_name] = RunningAgent(
+            status=AgentStatus(
+                name=agent_name,
+                status=container.status,
+                container=serialize_agent_container(container),
+            )
+        )
+        return StatusEvent(
+            resource_type=Resource.AGENT,
+            event_type=EventType.CREATE,
+            name=agent_name,
+            data=self.agents[agent_name].status,
+        )
+
+    def _handle_docker_stop_event(self, event: dict) -> Optional[StatusEvent]:
+        try:
+            agent_name = event["Actor"]["Attributes"]["Config"]["Labels"][
+                self.ROSTER_CONTAINER_LABEL
+            ]
+            container_name = event["Actor"]["Attributes"]["name"]
+            container = self.client.containers.get(container_name)
+        except (KeyError, docker.errors.NotFound):
+            return None
+
+        if agent_name not in self.agents:
+            # We don't know about this agent, so we don't care.
+            # This would also come from stopping the agent ourselves.
+            return None
+
+        # Otherwise, we should update the agent status and notify listeners.
+        self.agents[agent_name] = RunningAgent(
+            status=AgentStatus(
+                name=agent_name,
+                status=container.status,
+                container=serialize_agent_container(container),
+            )
+        )
+        return StatusEvent(
+            resource_type=Resource.AGENT,
+            event_type=EventType.UPDATE,
+            name=agent_name,
+            data=self.agents[agent_name].status,
+        )
+
+    def _handle_docker_kill_event(self, event: dict) -> Optional[StatusEvent]:
+        try:
+            agent_name = event["Actor"]["Attributes"]["Config"]["Labels"][
+                self.ROSTER_CONTAINER_LABEL
+            ]
+        except (KeyError, docker.errors.NotFound):
+            return None
+
+        if agent_name not in self.agents:
+            # We don't know about this agent, so we don't care.
+            # This would also come from removing the agent ourselves.
+            return None
+
+        # Otherwise, we should remove the agent status and notify listeners.
+        self.agents.pop(agent_name)
+        return StatusEvent(
+            resource_type=Resource.AGENT,
+            event_type=EventType.DELETE,
+            name=agent_name,
+        )
+
     async def _handle_docker_event(self, event: dict):
+        print(event)
         if event["Type"] != "container":
             return
 
-        if event["Action"] not in ["start", "stop", "die", "destroy"]:
+        status_event: StatusEvent
+        if event["Action"] == "start":
+            status_event = self._handle_docker_start_event(event)
+        elif event["Action"] == "stop":
+            status_event = self._handle_docker_stop_event(event)
+        elif event["Action"] in ["die", "destroy"]:
+            status_event = self._handle_docker_kill_event(event)
+        else:
             return
-
-        try:
-            container_name = event["Actor"]["Attributes"]["name"]
-            agent = self._find_agent_by_container_name(container_name)
-            container = self.client.containers.get(container_name)
-        except (KeyError, docker.errors.NotFound):
-            return
-
-        if agent is None:
-            return
-
-        agent.status.container = serialize_agent_container(container)
-        agent.status.status = container.status
 
         for listener in self.agent_status_listeners:
-            listener(agent.status)
+            listener(status_event)
 
     def add_agent_status_listener(self, listener: Callable):
         self.agent_status_listeners.append(listener)

@@ -3,6 +3,7 @@ from typing import Optional
 
 from roster_agent_runtime.controllers.agent import errors
 from roster_agent_runtime.executors import AgentExecutor
+from roster_agent_runtime.executors.events import EventType, StatusEvent
 from roster_agent_runtime.informers.roster import RosterInformer, RosterSpec
 from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
 from roster_agent_runtime.models.controller import ControllerState
@@ -35,6 +36,8 @@ class AgentController:
         self.executor = executor
         self.roster_informer = roster_informer
         self.state = ControllerState()
+        self.reconciliation_queue = asyncio.Queue()
+        self.reconciliation_task = None
 
     @property
     def desired(self):
@@ -52,17 +55,27 @@ class AgentController:
             print("Connections established.\nReconciling...")
             await self.reconcile()
             print("Reconciled.")
+            self.reconciliation_task = asyncio.create_task(self.reconcile_loop())
         except Exception as e:
             await self.teardown()
             raise errors.SetupError from e
 
     async def teardown(self):
+        self.reconciliation_task.cancel()
         try:
             await asyncio.gather(
                 self.roster_informer.teardown(), self.executor.teardown()
             )
         except Exception as e:
             raise errors.TeardownError from e
+
+    async def reconcile_loop(self):
+        while True:
+            # TODO: add safety measures (backoff etc.)
+            # right now, just reconcile globally on any change
+            # but later, should reconcile only the changed resource
+            await self.reconciliation_queue.get()
+            await self.reconcile()
 
     async def setup_roster_connection(self):
         # Setup Informer for Roster API resources (desired state)
@@ -107,21 +120,32 @@ class AgentController:
         self.executor.add_task_status_listener(self._handle_task_status_change)
         self.executor.add_agent_status_listener(self._handle_agent_status_change)
 
-    def _handle_task_status_change(self, task: TaskStatus):
+    def _handle_task_status_change(self, event: StatusEvent):
         try:
-            self.state.current.tasks[task.name] = task
-        except KeyError:
-            pass
+            # Assuming all full updates for Task
+            task = event.get_task_status()
+            self.current.tasks[task.name] = task
+        except (KeyError, ValueError):
+            return
+        self.reconciliation_queue.put_nowait(True)
 
-    def _handle_agent_status_change(self, agent: AgentStatus):
-        try:
-            self.state.current.agents[agent.name] = agent
-        except KeyError:
-            pass
+    def _handle_agent_status_change(self, event: StatusEvent):
+        if event.event_type in [EventType.CREATE, EventType.UPDATE]:
+            try:
+                agent = event.get_agent_status()
+                self.current.agents[agent.name] = agent
+            except (KeyError, ValueError):
+                return
+        elif event.event_type == EventType.DELETE:
+            try:
+                self.current.agents.pop(event.name)
+            except KeyError:
+                return
+        self.reconciliation_queue.put_nowait(True)
 
     async def reconcile(self):
-        # naive algorithm,
-        # but simply reconcile sequentially since Tasks depend on Agents
+        # this is for global reconciliation
+        # we reconcile sequentially since Tasks depend on Agents
         await self.reconcile_agents()
         await self.reconcile_tasks()
 
