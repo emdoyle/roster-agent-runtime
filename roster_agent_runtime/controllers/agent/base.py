@@ -111,7 +111,8 @@ class AgentController:
             elif isinstance(spec, TaskSpec):
                 self.desired.tasks[spec.name] = spec
         except KeyError:
-            pass
+            return
+        self.reconciliation_queue.put_nowait(True)
 
     def setup_spec_listeners(self):
         self.roster_informer.add_event_listener(self._handle_spec_change)
@@ -171,10 +172,12 @@ class AgentController:
         updated_agents = {}
         for name, spec in self.desired.agents.items():
             if name not in self.current.agents:
-                await self.create_agent(spec)
+                status = await self.create_agent(spec)
             elif not self.agent_matches_spec(self.current.agents[name], spec):
-                await self.update_agent(spec)
-            updated_agents[name] = spec
+                status = await self.update_agent(spec)
+            else:
+                status = self.current.agents[name]
+            updated_agents[name] = status
         current_agents = list(self.current.agents.items())
         for name, agent in current_agents:
             if name not in updated_agents:

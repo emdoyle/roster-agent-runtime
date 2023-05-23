@@ -39,7 +39,7 @@ class EventListener:
     def stop(self):
         if self.task is None:
             raise RuntimeError("Informer task does not exist")
-        self.task.stop()
+        self.task.cancel()
 
     def add_middleware(self, middleware: Callable):
         self.middleware.append(middleware)

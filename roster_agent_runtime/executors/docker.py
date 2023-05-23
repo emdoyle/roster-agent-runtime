@@ -5,6 +5,7 @@ import platform
 from typing import Callable, Optional
 
 import aiohttp
+import pydantic
 from pydantic import BaseModel
 from roster_agent_runtime.controllers.agent import errors
 from roster_agent_runtime.executors.base import AgentExecutor
@@ -69,7 +70,7 @@ def serialize_agent_container(
 def parse_task_status_line(line: str) -> TaskStatus:
     try:
         task_status = TaskStatus(**json.loads(line))
-    except (TypeError, json.JSONDecodeError) as e:
+    except (pydantic.ValidationError, json.JSONDecodeError) as e:
         raise errors.AgentServiceError(
             "Could not parse task status line from agent."
         ) from e
