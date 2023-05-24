@@ -63,7 +63,7 @@ class AgentContainer(BaseModel):
                 "id": "my_container_id",
                 "image": "my_image:latest",
                 "name": "my_container_name",
-                "status": "Running",
+                "status": "running",
                 "labels": {"my_label": "my_value"},
                 "capabilities": AgentCapabilities.Config.schema_extra["example"],
             }
@@ -82,7 +82,7 @@ class AgentStatus(BaseModel):
         schema_extra = {
             "example": {
                 "name": "Alice",
-                "status": "Running",
+                "status": "running",
                 "container": AgentContainer.Config.schema_extra["example"],
             }
         }
