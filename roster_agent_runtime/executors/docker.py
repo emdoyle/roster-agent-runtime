@@ -9,12 +9,17 @@ import pydantic
 from pydantic import BaseModel
 from roster_agent_runtime.controllers.agent import errors
 from roster_agent_runtime.executors.base import AgentExecutor
-from roster_agent_runtime.executors.events import EventType, Resource, StatusEvent
+from roster_agent_runtime.executors.events import (
+    EventType,
+    ExecutorStatusEvent,
+    Resource,
+)
 from roster_agent_runtime.listeners.base import EventListener
 from roster_agent_runtime.listeners.docker import (
     DEFAULT_EVENT_FILTERS,
     DockerEventListener,
 )
+from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.agent import (
     AgentCapabilities,
     AgentContainer,
@@ -25,6 +30,8 @@ from roster_agent_runtime.models.conversation import ConversationMessage
 from roster_agent_runtime.models.task import TaskSpec, TaskStatus
 
 import docker
+
+logger = app_logger()
 
 
 def get_host_ip(network_name="bridge", client=None):
@@ -101,7 +108,6 @@ class DockerAgentExecutor(AgentExecutor):
                 filters={"label": self.ROSTER_CONTAINER_LABEL, **DEFAULT_EVENT_FILTERS},
                 handlers=[self._handle_docker_event],
             )
-            self.docker_events_listener.run_as_task()
 
             # These listeners allow us to listen for changes to
             # task status within an Agent container.
@@ -109,8 +115,10 @@ class DockerAgentExecutor(AgentExecutor):
 
             # These listeners allow us to notify the agent controller
             # of changes to agent and task status.
-            self.agent_status_listeners: list[Callable[[StatusEvent], None]] = []
-            self.task_status_listeners: list[Callable[[StatusEvent], None]] = []
+            self.agent_status_listeners: list[
+                Callable[[ExecutorStatusEvent], None]
+            ] = []
+            self.task_status_listeners: list[Callable[[ExecutorStatusEvent], None]] = []
         except docker.errors.DockerException as e:
             raise errors.AgentServiceError("Could not connect to Docker daemon.") from e
 
@@ -170,8 +178,7 @@ class DockerAgentExecutor(AgentExecutor):
             self._add_agent_from_container(container)
 
     async def _fetch_task_status_for_agent(self, agent_name: str) -> list[TaskStatus]:
-        # Using mock data to test:
-        return [TaskStatus(agent_name=agent_name, name="MyTask", status="running")]
+        return []
         # try:
         #     url = (
         #         f"http://localhost:{self._get_service_port_for_agent(agent_name)}/tasks"
@@ -209,6 +216,7 @@ class DockerAgentExecutor(AgentExecutor):
 
     async def setup(self):
         await asyncio.gather(self._restore_agent_state(), self._restore_task_state())
+        self.docker_events_listener.run_as_task()
 
     async def teardown(self):
         self.docker_events_listener.stop()
@@ -228,7 +236,9 @@ class DockerAgentExecutor(AgentExecutor):
         self, agent_name: str, max_retries: int = 20, interval: float = 0.5
     ):
         for i in range(max_retries):
-            print(f"{i} Checking agent is healthy...")
+            logger.debug(
+                "(agent-exec) %s - Checking agent %s is healthy...", i, agent_name
+            )
             try:
                 port = self._get_service_port_for_agent(agent_name)
                 url = f"http://localhost:{port}/healthcheck"
@@ -356,7 +366,7 @@ class DockerAgentExecutor(AgentExecutor):
                 self._store_task(agent_name, task)
                 for listener in self.task_status_listeners:
                     listener(
-                        StatusEvent(
+                        ExecutorStatusEvent(
                             resource_type=Resource.TASK,
                             event_type=EventType.UPDATE,
                             data=task,
@@ -483,7 +493,7 @@ class DockerAgentExecutor(AgentExecutor):
             ):
                 return agent
 
-    def _handle_docker_start_event(self, event: dict) -> Optional[StatusEvent]:
+    def _handle_docker_start_event(self, event: dict) -> Optional[ExecutorStatusEvent]:
         try:
             agent_name = event["Actor"]["Attributes"]["Config"]["Labels"][
                 self.ROSTER_CONTAINER_LABEL
@@ -518,14 +528,14 @@ class DockerAgentExecutor(AgentExecutor):
                 container=serialize_agent_container(container),
             )
         )
-        return StatusEvent(
+        return ExecutorStatusEvent(
             resource_type=Resource.AGENT,
             event_type=EventType.CREATE,
             name=agent_name,
             data=self.agents[agent_name].status,
         )
 
-    def _handle_docker_stop_event(self, event: dict) -> Optional[StatusEvent]:
+    def _handle_docker_stop_event(self, event: dict) -> Optional[ExecutorStatusEvent]:
         try:
             agent_name = event["Actor"]["Attributes"]["Config"]["Labels"][
                 self.ROSTER_CONTAINER_LABEL
@@ -548,14 +558,14 @@ class DockerAgentExecutor(AgentExecutor):
                 container=serialize_agent_container(container),
             )
         )
-        return StatusEvent(
+        return ExecutorStatusEvent(
             resource_type=Resource.AGENT,
             event_type=EventType.UPDATE,
             name=agent_name,
             data=self.agents[agent_name].status,
         )
 
-    def _handle_docker_kill_event(self, event: dict) -> Optional[StatusEvent]:
+    def _handle_docker_kill_event(self, event: dict) -> Optional[ExecutorStatusEvent]:
         try:
             agent_name = event["Actor"]["Attributes"]["Config"]["Labels"][
                 self.ROSTER_CONTAINER_LABEL
@@ -570,18 +580,18 @@ class DockerAgentExecutor(AgentExecutor):
 
         # Otherwise, we should remove the agent status and notify listeners.
         self.agents.pop(agent_name)
-        return StatusEvent(
+        return ExecutorStatusEvent(
             resource_type=Resource.AGENT,
             event_type=EventType.DELETE,
             name=agent_name,
         )
 
     async def _handle_docker_event(self, event: dict):
-        print(event)
+        logger.debug("(docker-evt) Received: %s", event)
         if event["Type"] != "container":
             return
 
-        status_event: StatusEvent
+        status_event: ExecutorStatusEvent
         if event["Action"] == "start":
             status_event = self._handle_docker_start_event(event)
         elif event["Action"] == "stop":

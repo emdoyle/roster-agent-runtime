@@ -35,14 +35,3 @@ class CurrentState(BaseModel):
         description="The list of conversations which are currently active.",
         default_factory=dict,
     )
-
-
-class ControllerState(BaseModel):
-    desired: DesiredState = Field(
-        description="The desired state of the controller's resources.",
-        default_factory=DesiredState,
-    )
-    current: CurrentState = Field(
-        description="The current state of the controller's resources.",
-        default_factory=CurrentState,
-    )

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable
 
-from roster_agent_runtime.executors.events import StatusEvent
+from roster_agent_runtime.executors.events import ExecutorStatusEvent
 from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
 from roster_agent_runtime.models.conversation import ConversationMessage
 from roster_agent_runtime.models.task import TaskSpec, TaskStatus
@@ -66,9 +66,11 @@ class AgentExecutor(ABC):
         """prompt agent in conversation"""
 
     @abstractmethod
-    def add_agent_status_listener(self, listener: Callable[[StatusEvent], None]):
+    def add_agent_status_listener(
+        self, listener: Callable[[ExecutorStatusEvent], None]
+    ):
         """add listener to agent status"""
 
     @abstractmethod
-    def add_task_status_listener(self, listener: Callable[[StatusEvent], None]):
+    def add_task_status_listener(self, listener: Callable[[ExecutorStatusEvent], None]):
         """add listener to task status"""

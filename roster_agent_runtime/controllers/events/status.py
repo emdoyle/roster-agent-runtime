@@ -12,12 +12,11 @@ class Resource(Enum):
 
 
 class EventType(Enum):
-    CREATE = "Create"
-    UPDATE = "Update"
-    DELETE = "Delete"
+    PUT = "PUT"
+    DELETE = "DELETE"
 
 
-class ExecutorStatusEvent(BaseModel):
+class ControllerStatusEvent(BaseModel):
     resource_type: Resource
     event_type: EventType
     name: str
