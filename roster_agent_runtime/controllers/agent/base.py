@@ -1,12 +1,13 @@
 import asyncio
 from typing import Optional
 
-from roster_agent_runtime.controllers.agent import errors
+from roster_agent_runtime import errors
 from roster_agent_runtime.controllers.agent.store import AgentControllerStore
 from roster_agent_runtime.controllers.events.status import ControllerStatusEvent
 from roster_agent_runtime.executors import AgentExecutor
 from roster_agent_runtime.executors.events import EventType, ExecutorStatusEvent
-from roster_agent_runtime.informers.roster import RosterInformer, RosterSpec
+from roster_agent_runtime.informers.events.spec import RosterSpecEvent
+from roster_agent_runtime.informers.roster import RosterInformer
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
 from roster_agent_runtime.models.task import TaskSpec, TaskStatus
@@ -49,7 +50,7 @@ class AgentController:
         self.roster_informer = roster_informer
         self.roster_notifier = roster_notifier
         self.store = AgentControllerStore(
-            status_listeners=[self._notify_roster_status_change]
+            status_listeners=[self._notify_roster_status_event]
         )
         self.reconciliation_queue = asyncio.Queue()
         self.reconciliation_task = None
@@ -131,24 +132,43 @@ class AgentController:
         for status in self.executor.list_tasks():
             self.store.put_task(status.name, status)
 
-    def _handle_spec_change(self, spec: RosterSpec):
-        try:
-            if isinstance(spec, AgentSpec):
-                self.desired.agents[spec.name] = spec
-            elif isinstance(spec, TaskSpec):
-                self.desired.tasks[spec.name] = spec
-        except KeyError:
-            return
+    def _handle_put_spec_event(self, event: RosterSpecEvent):
+        if event.resource_type == "AGENT":
+            self.desired.agents[event.name] = event.spec
+        elif event.resource_type == "TASK":
+            self.desired.tasks[event.name] = event.spec
+        elif event.resource_type == "CONVERSATION":
+            self.desired.conversations[event.name] = event.spec
+        else:
+            logger.warn("(agent-control) Unknown resource type: %s", event)
+
+    def _handle_delete_spec_event(self, event: RosterSpecEvent):
+        if event.resource_type == "AGENT":
+            self.desired.agents.pop(event.name, None)
+        elif event.resource_type == "TASK":
+            self.desired.tasks.pop(event.name, None)
+        elif event.resource_type == "CONVERSATION":
+            self.desired.conversations.pop(event.name, None)
+        else:
+            logger.warn("(agent-control) Unknown resource type: %s", event)
+
+    def _handle_spec_event(self, event: RosterSpecEvent):
+        if event.event_type == "PUT":
+            self._handle_put_spec_event(event)
+        elif event.event_type == "DELETE":
+            self._handle_delete_spec_event(event)
+        else:
+            logger.warn("(agent-control) Unknown event: %s", event)
         self.reconciliation_queue.put_nowait(True)
 
     def setup_spec_listeners(self):
-        self.roster_informer.add_event_listener(self._handle_spec_change)
+        self.roster_informer.add_event_listener(self._handle_spec_event)
 
     def setup_status_listeners(self):
-        self.executor.add_task_status_listener(self._handle_task_status_change)
-        self.executor.add_agent_status_listener(self._handle_agent_status_change)
+        self.executor.add_task_status_listener(self._handle_task_status_event)
+        self.executor.add_agent_status_listener(self._handle_agent_status_event)
 
-    def _handle_task_status_change(self, event: ExecutorStatusEvent):
+    def _handle_task_status_event(self, event: ExecutorStatusEvent):
         try:
             # Assuming all full updates for Task
             task = event.get_task_status()
@@ -157,7 +177,7 @@ class AgentController:
             return
         self.reconciliation_queue.put_nowait(True)
 
-    def _handle_agent_status_change(self, event: ExecutorStatusEvent):
+    def _handle_agent_status_event(self, event: ExecutorStatusEvent):
         if event.event_type in [EventType.CREATE, EventType.UPDATE]:
             try:
                 agent = event.get_agent_status()
@@ -171,7 +191,7 @@ class AgentController:
                 return
         self.reconciliation_queue.put_nowait(True)
 
-    def _notify_roster_status_change(self, event: ControllerStatusEvent):
+    def _notify_roster_status_event(self, event: ControllerStatusEvent):
         self.roster_notifier.push_event(event)
 
     async def reconcile(self):

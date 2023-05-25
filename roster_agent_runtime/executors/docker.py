@@ -7,7 +7,7 @@ from typing import Callable, Optional
 import aiohttp
 import pydantic
 from pydantic import BaseModel
-from roster_agent_runtime.controllers.agent import errors
+from roster_agent_runtime import errors
 from roster_agent_runtime.executors.base import AgentExecutor
 from roster_agent_runtime.executors.events import (
     EventType,
@@ -43,7 +43,7 @@ def get_host_ip(network_name="bridge", client=None):
         try:
             gateway = network.attrs["IPAM"]["Config"][0]["Gateway"]
         except (IndexError, KeyError):
-            raise errors.AgentServiceError(
+            raise errors.RosterError(
                 "Could not determine host IP for network: {}".format(network_name)
             )
         return gateway
@@ -52,9 +52,7 @@ def get_host_ip(network_name="bridge", client=None):
         return "host.docker.internal"
 
     else:
-        raise errors.AgentServiceError(
-            "Unsupported operating system: {}".format(os_name)
-        )
+        raise errors.RosterError("Unsupported operating system: {}".format(os_name))
 
 
 def serialize_agent_container(
@@ -78,9 +76,7 @@ def parse_task_status_line(line: str) -> TaskStatus:
     try:
         task_status = TaskStatus(**json.loads(line))
     except (pydantic.ValidationError, json.JSONDecodeError) as e:
-        raise errors.AgentServiceError(
-            "Could not parse task status line from agent."
-        ) from e
+        raise errors.RosterError("Could not parse task status line from agent.") from e
     return task_status
 
 
@@ -105,7 +101,10 @@ class DockerAgentExecutor(AgentExecutor):
             # This allows us to listen for changes to
             # container status in the Docker environment.
             self.docker_events_listener = DockerEventListener(
-                filters={"label": self.ROSTER_CONTAINER_LABEL, **DEFAULT_EVENT_FILTERS},
+                filters={
+                    "label": {self.ROSTER_CONTAINER_LABEL: True},
+                    **DEFAULT_EVENT_FILTERS,
+                },
                 handlers=[self._handle_docker_event],
             )
 
@@ -120,7 +119,7 @@ class DockerAgentExecutor(AgentExecutor):
             ] = []
             self.task_status_listeners: list[Callable[[ExecutorStatusEvent], None]] = []
         except docker.errors.DockerException as e:
-            raise errors.AgentServiceError("Could not connect to Docker daemon.") from e
+            raise errors.RosterError("Could not connect to Docker daemon.") from e
 
     @property
     def host_ip(self):
@@ -147,9 +146,7 @@ class DockerAgentExecutor(AgentExecutor):
                 "HostPort"
             ]
         except (IndexError, KeyError):
-            raise errors.AgentServiceError(
-                f"Could not determine host port for agent {name}."
-            )
+            raise errors.RosterError(f"Could not determine host port for agent {name}.")
 
     def _add_agent_from_container(
         self, container: "docker.models.containers.Container"
@@ -158,7 +155,7 @@ class DockerAgentExecutor(AgentExecutor):
         try:
             agent_name = container.labels[self.ROSTER_CONTAINER_LABEL]
         except KeyError:
-            raise errors.AgentServiceError(
+            raise errors.RosterError(
                 f"Could not restore agent from container {container.name}."
             )
         self.agents[agent_name] = RunningAgent(
@@ -284,7 +281,7 @@ class DockerAgentExecutor(AgentExecutor):
         except docker.errors.ImageNotFound as e:
             raise errors.AgentImageNotFoundError(image=agent.image) from e
         except docker.errors.APIError as e:
-            raise errors.AgentServiceError("Could not pull image.") from e
+            raise errors.RosterError("Could not pull image.") from e
 
         if agent.capabilities.network_access:
             network_mode = "default"
@@ -309,9 +306,7 @@ class DockerAgentExecutor(AgentExecutor):
             )
             container.reload()
         except docker.errors.APIError as e:
-            raise errors.AgentServiceError(
-                f"Could not create agent {agent.name}."
-            ) from e
+            raise errors.RosterError(f"Could not create agent {agent.name}.") from e
 
         self._add_agent_from_container(container)
         if wait_for_healthy:
@@ -326,8 +321,8 @@ class DockerAgentExecutor(AgentExecutor):
         #   but will kill all running tasks
         try:
             await self.delete_agent(agent.name)
-        except errors.AgentServiceError:
-            raise errors.AgentServiceError(f"Could not update agent {agent.name}.")
+        except errors.RosterError:
+            raise errors.RosterError(f"Could not update agent {agent.name}.")
 
         return await self.create_agent(agent)
 
@@ -358,7 +353,7 @@ class DockerAgentExecutor(AgentExecutor):
             container.stop()
             container.remove()
         except docker.errors.APIError as e:
-            raise errors.AgentServiceError(f"Could not delete agent {name}.") from e
+            raise errors.RosterError(f"Could not delete agent {name}.") from e
 
     def _task_event_handler(self, agent_name: str) -> Callable:
         def handler(task: TaskStatus) -> None:
@@ -403,13 +398,11 @@ class DockerAgentExecutor(AgentExecutor):
                         task_status = TaskStatus(**response)
                         self._store_task(task.agent_name, task_status)
                     except (TypeError, aiohttp.ContentTypeError) as e:
-                        raise errors.AgentServiceError(
+                        raise errors.RosterError(
                             f"Could not parse response from agent {task.agent_name}."
                         ) from e
             except aiohttp.ClientError as e:
-                raise errors.AgentServiceError(
-                    f"Could not initiate task {task.name}."
-                ) from e
+                raise errors.RosterError(f"Could not initiate task {task.name}.") from e
 
         return task_status
 
@@ -448,9 +441,7 @@ class DockerAgentExecutor(AgentExecutor):
                 ) as response:
                     assert response.status == 204
             except (AssertionError, aiohttp.ClientError) as e:
-                raise errors.AgentServiceError(
-                    f"Could not end task {task.name}."
-                ) from e
+                raise errors.RosterError(f"Could not end task {task.name}.") from e
 
     async def prompt(
         self,
@@ -473,13 +464,11 @@ class DockerAgentExecutor(AgentExecutor):
                         response = await response.json()
                         conversation_message = ConversationMessage(**response)
                     except (TypeError, aiohttp.ContentTypeError) as e:
-                        raise errors.AgentServiceError(
+                        raise errors.RosterError(
                             f"Could not parse response from agent {name}."
                         ) from e
             except aiohttp.ClientError as e:
-                raise errors.AgentServiceError(
-                    f"Could not connect to agent {name}."
-                ) from e
+                raise errors.RosterError(f"Could not connect to agent {name}.") from e
 
         return conversation_message
 
@@ -495,9 +484,7 @@ class DockerAgentExecutor(AgentExecutor):
 
     def _handle_docker_start_event(self, event: dict) -> Optional[ExecutorStatusEvent]:
         try:
-            agent_name = event["Actor"]["Attributes"]["Config"]["Labels"][
-                self.ROSTER_CONTAINER_LABEL
-            ]
+            agent_name = event["Actor"]["Attributes"][self.ROSTER_CONTAINER_LABEL]
             container_name = event["Actor"]["Attributes"]["name"]
             container = self.client.containers.get(container_name)
         except (KeyError, docker.errors.NotFound):
@@ -537,9 +524,7 @@ class DockerAgentExecutor(AgentExecutor):
 
     def _handle_docker_stop_event(self, event: dict) -> Optional[ExecutorStatusEvent]:
         try:
-            agent_name = event["Actor"]["Attributes"]["Config"]["Labels"][
-                self.ROSTER_CONTAINER_LABEL
-            ]
+            agent_name = event["Actor"]["Attributes"][self.ROSTER_CONTAINER_LABEL]
             container_name = event["Actor"]["Attributes"]["name"]
             container = self.client.containers.get(container_name)
         except (KeyError, docker.errors.NotFound):
@@ -567,9 +552,7 @@ class DockerAgentExecutor(AgentExecutor):
 
     def _handle_docker_kill_event(self, event: dict) -> Optional[ExecutorStatusEvent]:
         try:
-            agent_name = event["Actor"]["Attributes"]["Config"]["Labels"][
-                self.ROSTER_CONTAINER_LABEL
-            ]
+            agent_name = event["Actor"]["Attributes"][self.ROSTER_CONTAINER_LABEL]
         except (KeyError, docker.errors.NotFound):
             return None
 
@@ -599,6 +582,9 @@ class DockerAgentExecutor(AgentExecutor):
         elif event["Action"] in ["die", "destroy"]:
             status_event = self._handle_docker_kill_event(event)
         else:
+            return
+
+        if status_event is None:
             return
 
         for listener in self.agent_status_listeners:

@@ -1,14 +1,19 @@
 import asyncio
+import json
 from typing import Callable, Optional
 
 import aiohttp
 
+from ..logs import app_logger
 from .stream import JSONStream
 
 DEFAULT_EVENT_FILTERS = {
-    "type": "container",
-    "event": ["start", "stop", "die", "destroy"],
+    "type": {"container": True},
+    "event": {"start": True, "stop": True, "die": True, "destroy": True},
 }
+
+
+logger = app_logger()
 
 
 class DockerEventListener:
@@ -31,21 +36,27 @@ class DockerEventListener:
         async with aiohttp.ClientSession(
             connector=aiohttp.UnixConnector(path="/var/run/docker.sock")
         ) as session:
-            async with session.get(
-                "http://localhost/events",
-                headers={"Content-Type": "application/json"},
-                params={**self.filters, "stream": "1"},
-                timeout=0,
-            ) as resp:
-                self.json_stream = JSONStream(resp)
-                try:
-                    async for event in self.json_stream:
-                        for middleware in self.middleware:
-                            event = await middleware(event)
-                        for handler in self.handlers:
-                            await handler(event)
-                finally:
-                    self.json_stream = None
+            json_encoded_filters = json.dumps(self.filters)
+            logger.info("about to listen %s", json_encoded_filters)
+            try:
+                async with session.get(
+                    "http://localhost/events",
+                    headers={"Content-Type": "application/json"},
+                    params={"filters": json_encoded_filters, "stream": "1"},
+                    timeout=0,
+                ) as resp:
+                    logger.info(resp.url)
+                    self.json_stream = JSONStream(resp)
+                    try:
+                        async for event in self.json_stream:
+                            for middleware in self.middleware:
+                                event = await middleware(event)
+                            for handler in self.handlers:
+                                await handler(event)
+                    finally:
+                        self.json_stream = None
+            except Exception:
+                logger.exception("failed to listen")
 
     def run_as_task(self) -> asyncio.Task:
         if self.task is not None:

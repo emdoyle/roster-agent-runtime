@@ -1,6 +1,6 @@
 from typing import Callable
 
-from roster_agent_runtime.controllers.agent import errors
+from roster_agent_runtime import errors
 from roster_agent_runtime.executors.base import AgentExecutor
 from roster_agent_runtime.executors.docker import RunningAgent
 from roster_agent_runtime.models.agent import (
@@ -68,8 +68,8 @@ class MockAgentExecutor(AgentExecutor):
     async def update_agent(self, agent: AgentSpec) -> AgentStatus:
         try:
             await self.delete_agent(agent.name)
-        except errors.AgentServiceError:
-            raise errors.AgentServiceError(f"Could not update agent {agent.name}.")
+        except errors.RosterError:
+            raise errors.RosterError(f"Could not update agent {agent.name}.")
 
         return await self.create_agent(agent)
 

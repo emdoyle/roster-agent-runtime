@@ -1,4 +1,4 @@
-class AgentServiceError(Exception):
+class RosterError(Exception):
     """Base exception class for Agent Service errors."""
 
     def __init__(self, message="An unexpected error occurred.", details=None):
@@ -7,7 +7,7 @@ class AgentServiceError(Exception):
         self.details = details
 
 
-class CreateAgentError(AgentServiceError):
+class CreateAgentError(RosterError):
     """Exception raised when an error occurs when creating an Agent."""
 
     def __init__(
@@ -57,7 +57,7 @@ class AgentImageNotFoundError(CreateAgentError):
         self.image = image
 
 
-class AgentNotFoundError(AgentServiceError):
+class AgentNotFoundError(RosterError):
     """Exception raised when an Agent is not found."""
 
     def __init__(
@@ -67,7 +67,7 @@ class AgentNotFoundError(AgentServiceError):
         self.agent = agent
 
 
-class TaskError(AgentServiceError):
+class TaskError(RosterError):
     """Base exception class for Task errors."""
 
     def __init__(
@@ -104,7 +104,7 @@ class TaskNotFoundError(TaskError):
         super().__init__(message, details, task)
 
 
-class ConversationError(AgentServiceError):
+class ConversationError(RosterError):
     """Base exception class for Conversation errors."""
 
     def __init__(
@@ -153,7 +153,7 @@ class ConversationNotAvailableError(ConversationError):
         super().__init__(message, details, conversation)
 
 
-class InvalidRequestError(AgentServiceError):
+class InvalidRequestError(RosterError):
     """Exception raised when an invalid request is made."""
 
     def __init__(
@@ -164,7 +164,7 @@ class InvalidRequestError(AgentServiceError):
         super().__init__(message, details)
 
 
-class SetupError(AgentServiceError):
+class SetupError(RosterError):
     """Exception raised when an error occurs during set up."""
 
     def __init__(
@@ -175,12 +175,23 @@ class SetupError(AgentServiceError):
         super().__init__(message, details)
 
 
-class TeardownError(AgentServiceError):
+class TeardownError(RosterError):
     """Exception raised when an error occurs during tear down."""
 
     def __init__(
         self,
         message="An error occurred when attempting to tear down.",
+        details=None,
+    ):
+        super().__init__(message, details)
+
+
+class InvalidEventError(RosterError):
+    """Exception raised when an invalid event is received."""
+
+    def __init__(
+        self,
+        message="The event is invalid.",
         details=None,
     ):
         super().__init__(message, details)

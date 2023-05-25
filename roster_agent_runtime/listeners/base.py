@@ -2,6 +2,9 @@ import asyncio
 from typing import Callable, Optional
 
 import aiohttp
+from roster_agent_runtime.logs import app_logger
+
+logger = app_logger()
 
 
 class EventListener:

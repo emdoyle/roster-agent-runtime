@@ -1,6 +1,6 @@
 from typing import Callable, Optional
 
-from roster_agent_runtime.controllers.agent import errors
+from roster_agent_runtime import errors
 from roster_agent_runtime.controllers.events.status import (
     ControllerStatusEvent,
     EventType,
