@@ -13,7 +13,9 @@ RosterSpec = Union[AgentSpec, TaskSpec, ConversationSpec]
 class PutSpecEvent(BaseModel):
     event_type: Literal["PUT"] = Field(default="PUT", description="The type of event.")
     resource_type: str = Field(description="The type of resource.")
-    namespace: str = Field(description="The namespace of the resource.")
+    namespace: str = Field(
+        default="default", description="The namespace of the resource."
+    )
     name: str = Field(description="The name of the resource.")
     spec: RosterSpec = Field(description="The specification of the resource.")
 
@@ -29,7 +31,7 @@ class DeleteSpecEvent(BaseModel):
         default="DELETE", description="The type of event."
     )
     resource_type: str = Field(description="The type of resource.")
-    namespace: str = Field(description="The namespace of the agent.")
+    namespace: str = Field(default="default", description="The namespace of the agent.")
     name: str = Field(description="The name of the agent.")
 
     class Config:

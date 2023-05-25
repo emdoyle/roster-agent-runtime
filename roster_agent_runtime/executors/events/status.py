@@ -12,8 +12,7 @@ class Resource(Enum):
 
 
 class EventType(Enum):
-    CREATE = "Create"
-    UPDATE = "Update"
+    PUT = "Put"
     DELETE = "Delete"
 
 

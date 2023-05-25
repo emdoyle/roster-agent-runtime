@@ -37,7 +37,9 @@ class DockerEventListener:
             connector=aiohttp.UnixConnector(path="/var/run/docker.sock")
         ) as session:
             json_encoded_filters = json.dumps(self.filters)
-            logger.info("about to listen %s", json_encoded_filters)
+            logger.debug(
+                "About to listen to Docker events with filters %s", json_encoded_filters
+            )
             try:
                 async with session.get(
                     "http://localhost/events",
@@ -45,18 +47,22 @@ class DockerEventListener:
                     params={"filters": json_encoded_filters, "stream": "1"},
                     timeout=0,
                 ) as resp:
-                    logger.info(resp.url)
                     self.json_stream = JSONStream(resp)
                     try:
                         async for event in self.json_stream:
-                            for middleware in self.middleware:
-                                event = await middleware(event)
-                            for handler in self.handlers:
-                                await handler(event)
+                            try:
+                                for middleware in self.middleware:
+                                    event = await middleware(event)
+                                for handler in self.handlers:
+                                    await handler(event)
+                            except Exception as e:
+                                logger.warn(
+                                    "(docker-evt) Middleware or handler failed: %s", e
+                                )
                     finally:
                         self.json_stream = None
             except Exception:
-                logger.exception("failed to listen")
+                logger.exception("Docker events listener failed to start.")
 
     def run_as_task(self) -> asyncio.Task:
         if self.task is not None:

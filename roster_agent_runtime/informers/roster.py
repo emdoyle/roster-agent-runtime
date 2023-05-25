@@ -1,5 +1,6 @@
 from typing import Callable, Optional
 
+import aiohttp
 from pydantic import BaseModel, Field
 from roster_agent_runtime import settings
 from roster_agent_runtime.informers.base import Informer
@@ -50,12 +51,36 @@ class RosterInformer(Informer[RosterSpecEvent]):
         )
         self.event_listeners: list[Callable[[RosterSpecEvent], None]] = []
 
+    async def _load_initial_specs(self):
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(self.url_config.agents_url) as resp:
+                    for agent in await resp.json():
+                        self.agents[agent["name"]] = AgentSpec(**agent)
+            except (aiohttp.ClientError, ValueError):
+                logger.error("(roster-spec) Failed to load initial agents")
+            try:
+                async with session.get(self.url_config.tasks_url) as resp:
+                    for task in await resp.json():
+                        self.tasks[task["name"]] = TaskSpec(**task)
+            except (aiohttp.ClientError, ValueError):
+                logger.error("(roster-spec) Failed to load initial tasks")
+            try:
+                async with session.get(self.url_config.conversations_url) as resp:
+                    for conversation in await resp.json():
+                        self.conversations[conversation["name"]] = ConversationSpec(
+                            **conversation
+                        )
+            except (aiohttp.ClientError, ValueError):
+                logger.error("(roster-spec) Failed to load initial conversations")
+
     async def setup(self):
-        logger.info("Setting up Roster Informer")
+        logger.debug("Setting up Roster Informer")
         self.roster_listener.run_as_task()
-        # TODO: list resources from roster API
+        await self._load_initial_specs()
 
     async def teardown(self):
+        logger.debug("Tearing down Roster Informer")
         self.roster_listener.stop()
 
     def _handle_put_spec_event(self, event: RosterSpecEvent):
@@ -85,6 +110,7 @@ class RosterInformer(Informer[RosterSpecEvent]):
             self._handle_delete_spec_event(event)
         else:
             logger.warn("(roster-spec) Unknown event: %s", event)
+        logger.debug("(roster-spec) Pushing Spec event to listeners: %s", event)
         for listener in self.event_listeners:
             listener(event)
 

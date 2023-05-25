@@ -66,11 +66,9 @@ class AgentExecutor(ABC):
         """prompt agent in conversation"""
 
     @abstractmethod
-    def add_agent_status_listener(
-        self, listener: Callable[[ExecutorStatusEvent], None]
-    ):
-        """add listener to agent status"""
+    def add_event_listener(self, listener: Callable[[ExecutorStatusEvent], None]):
+        """add listener"""
 
     @abstractmethod
-    def add_task_status_listener(self, listener: Callable[[ExecutorStatusEvent], None]):
-        """add listener to task status"""
+    def remove_event_listener(self, listener: Callable[[ExecutorStatusEvent], None]):
+        """remove listener"""

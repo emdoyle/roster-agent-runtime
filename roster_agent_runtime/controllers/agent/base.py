@@ -5,7 +5,11 @@ from roster_agent_runtime import errors
 from roster_agent_runtime.controllers.agent.store import AgentControllerStore
 from roster_agent_runtime.controllers.events.status import ControllerStatusEvent
 from roster_agent_runtime.executors import AgentExecutor
-from roster_agent_runtime.executors.events import EventType, ExecutorStatusEvent
+from roster_agent_runtime.executors.events import (
+    EventType,
+    ExecutorStatusEvent,
+    Resource,
+)
 from roster_agent_runtime.informers.events.spec import RosterSpecEvent
 from roster_agent_runtime.informers.roster import RosterInformer
 from roster_agent_runtime.logs import app_logger
@@ -33,8 +37,6 @@ def get_agent_controller() -> "AgentController":
     )
     return AGENT_CONTROLLER
 
-
-# TODO: fix thread/coroutine safety throughout
 
 # Consider separating TaskController from AgentController
 # main thing is the Executor relationship
@@ -72,9 +74,7 @@ class AgentController:
                 self.setup_executor_connection(),
             )
             logger.debug("(agent-control) Connection setup complete.")
-            logger.debug("(agent-control) Reconciling...")
             await self.reconcile()
-            logger.debug("(agent-control) Reconciled.")
             logger.debug("(agent-control) Starting reconciliation loop...")
             self.reconciliation_task = asyncio.create_task(self.reconcile_loop())
             logger.debug("(agent-control) Reconciliation loop started.")
@@ -165,8 +165,7 @@ class AgentController:
         self.roster_informer.add_event_listener(self._handle_spec_event)
 
     def setup_status_listeners(self):
-        self.executor.add_task_status_listener(self._handle_task_status_event)
-        self.executor.add_agent_status_listener(self._handle_agent_status_event)
+        self.executor.add_event_listener(self._handle_status_event)
 
     def _handle_task_status_event(self, event: ExecutorStatusEvent):
         try:
@@ -178,7 +177,7 @@ class AgentController:
         self.reconciliation_queue.put_nowait(True)
 
     def _handle_agent_status_event(self, event: ExecutorStatusEvent):
-        if event.event_type in [EventType.CREATE, EventType.UPDATE]:
+        if event.event_type == EventType.PUT:
             try:
                 agent = event.get_agent_status()
                 self.store.put_agent(event.name, agent)
@@ -191,14 +190,24 @@ class AgentController:
                 return
         self.reconciliation_queue.put_nowait(True)
 
+    def _handle_status_event(self, event: ExecutorStatusEvent):
+        if event.resource_type == Resource.AGENT:
+            self._handle_agent_status_event(event)
+        elif event.resource_type == Resource.TASK:
+            self._handle_task_status_event(event)
+        else:
+            logger.warn("(agent-control) Unknown status event resource type: %s", event)
+
     def _notify_roster_status_event(self, event: ControllerStatusEvent):
         self.roster_notifier.push_event(event)
 
     async def reconcile(self):
+        logger.info("Controller reconciling...")
         # this is for global reconciliation
         # we reconcile sequentially since Tasks depend on Agents
         await self.reconcile_agents()
         await self.reconcile_tasks()
+        logger.info("Controller reconciled.")
 
     @staticmethod
     def agent_matches_spec(agent: AgentStatus, spec: AgentSpec) -> bool:
@@ -216,7 +225,7 @@ class AgentController:
         return True
 
     async def reconcile_agents(self):
-        logger.info("Reconciling agents...")
+        logger.debug("(rec-agents) Reconciling agents...")
         logger.debug("(rec-agents) Current agents: %s", self.current.agents)
         logger.debug("(rec-agents) Desired agents: %s", self.desired.agents)
         for name, spec in self.desired.agents.items():
@@ -235,7 +244,7 @@ class AgentController:
         return task.name == spec.name and task.agent_name == spec.agent_name
 
     async def reconcile_tasks(self):
-        logger.info("Reconciling tasks...")
+        logger.debug("(rec-tasks) Reconciling tasks...")
         logger.debug("(rec-tasks) Current tasks: %s", self.current.tasks)
         logger.debug("(rec-tasks) Desired tasks: %s", self.desired.tasks)
         for name, spec in self.desired.tasks.items():
@@ -259,13 +268,17 @@ class AgentController:
         if agent.name in self.current.agents:
             raise errors.AgentAlreadyExistsError(agent=agent.name)
         self.store.put_agent(agent.name, await self.executor.create_agent(agent))
-        return self.current.agents[agent.name]
+        status = self.current.agents[agent.name]
+        logger.info("Created agent %s", agent.name)
+        return status
 
     async def update_agent(self, agent: AgentSpec) -> AgentStatus:
         if agent.name not in self.current.agents:
             raise errors.AgentNotFoundError(agent=agent.name)
         self.store.put_agent(agent.name, await self.executor.update_agent(agent))
-        return self.current.agents[agent.name]
+        status = self.current.agents[agent.name]
+        logger.info("Updated agent %s", agent.name)
+        return status
 
     def list_agents(self) -> list[AgentStatus]:
         return list(self.current.agents.values())
@@ -280,6 +293,7 @@ class AgentController:
         try:
             await self.executor.delete_agent(name)
             self.store.delete_agent(name)
+            logger.info("Deleted agent %s", name)
         except errors.AgentNotFoundError:
             pass
 
@@ -296,7 +310,9 @@ class AgentController:
             raise errors.AgentNotFoundError(agent=task.agent_name)
 
         self.store.put_task(task.name, await self.executor.initiate_task(task))
-        return self.current.tasks[task.name]
+        status = self.current.tasks[task.name]
+        logger.info("Initiated task %s", task.name)
+        return status
 
     async def update_task(self, task: TaskSpec) -> TaskStatus:
         if task.name not in self.current.tasks:
@@ -305,7 +321,9 @@ class AgentController:
             raise errors.AgentNotFoundError(agent=task.agent_name)
 
         self.store.put_task(task.name, await self.executor.update_task(task))
-        return self.current.tasks[task.name]
+        status = self.current.tasks[task.name]
+        logger.info("Updated task %s", task.name)
+        return status
 
     def list_tasks(self) -> list[TaskStatus]:
         return list(self.current.tasks.values())
@@ -320,5 +338,6 @@ class AgentController:
         try:
             await self.executor.end_task(name)
             self.store.delete_task(name)
+            logger.info("Deleted task %s", name)
         except errors.TaskNotFoundError:
             pass
