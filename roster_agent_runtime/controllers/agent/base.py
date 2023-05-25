@@ -102,8 +102,11 @@ class AgentController:
             # TODO: add safety measures (backoff etc.)
             # right now, just reconcile globally on any change
             # but later, should reconcile only the changed resource
-            await self.reconciliation_queue.get()
-            await self.reconcile()
+            try:
+                await self.reconciliation_queue.get()
+                await self.reconcile()
+            except Exception as e:
+                logger.error("(agent-control) Error during reconciliation: %s", e)
 
     async def setup_roster_connection(self):
         # Setup Informer for Roster API resources (desired state)

@@ -78,7 +78,6 @@ def parse_task_status_line(line: str) -> TaskStatus:
 
 
 class ExpectedStatusEvent(BaseModel):
-    event: asyncio.Event = Field(default_factory=asyncio.Event, init=False)
     action: str
     agent_name: str
     expiration: float = Field(
@@ -154,7 +153,12 @@ class DockerAgentExecutor(AgentExecutor):
     ) -> Optional[ExpectedStatusEvent]:
         result = None
         result_idx = None
-        for i, expected_event in enumerate(self._expected_events):
+        for i, expected_event in enumerate(
+            filter(
+                lambda event: event.expiration > asyncio.get_event_loop().time(),
+                self._expected_events,
+            )
+        ):
             if (
                 expected_event.agent_name == agent_name
                 and expected_event.action == action
@@ -396,11 +400,11 @@ class DockerAgentExecutor(AgentExecutor):
         # NOTE: delete then recreate strategy is used for simplicity
         #   but will kill all running tasks
         try:
-            await self.delete_agent(agent.name)
+            await self._delete_agent(agent.name)
         except errors.RosterError:
             raise errors.RosterError(f"Could not update agent {agent.name}.")
 
-        return await self.create_agent(agent)
+        return await self._create_agent(agent)
 
     async def update_agent(self, agent: AgentSpec) -> AgentStatus:
         async with self.get_agent_lock(agent.name):
