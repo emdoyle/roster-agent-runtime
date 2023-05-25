@@ -20,7 +20,3 @@ class Informer(ABC, Generic[T]):
     @abstractmethod
     def list(self) -> list[T]:
         """list all objects"""
-
-    @abstractmethod
-    def get(self, id: str) -> T:
-        """get object"""

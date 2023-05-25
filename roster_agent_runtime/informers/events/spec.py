@@ -3,9 +3,12 @@ from typing import Literal, Union
 
 from pydantic import BaseModel, Field
 from roster_agent_runtime import errors
+from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.agent import AgentSpec
 from roster_agent_runtime.models.conversation import ConversationSpec
 from roster_agent_runtime.models.task import TaskSpec
+
+logger = app_logger()
 
 RosterSpec = Union[AgentSpec, TaskSpec, ConversationSpec]
 
@@ -44,23 +47,27 @@ class DeleteSpecEvent(BaseModel):
 RosterSpecEvent = Union[PutSpecEvent, DeleteSpecEvent]
 
 
-def deserialize_spec_event(event: bytes) -> RosterSpecEvent:
+def deserialize_spec_event(event: str) -> RosterSpecEvent:
     try:
-        json_event = json.loads(event.decode("utf-8"))
+        json_event = json.loads(json.loads(event))
+        logger.debug("Deserialized Spec Event %s", json_event)
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         raise errors.InvalidEventError(f"Invalid Spec Event {event}") from e
-    if json_event["event_type"] == "PUT":
-        if json_event["resource_type"] == "AGENT":
-            json_event["spec"] = AgentSpec(**json_event["spec"])
-        elif json_event["resource_type"] == "TASK":
-            json_event["spec"] = TaskSpec(**json_event["spec"])
-        elif json_event["resource_type"] == "CONVERSATION":
-            json_event["spec"] = ConversationSpec(**json_event["spec"])
-        else:
-            raise errors.InvalidEventError(
-                f"Invalid Spec Event (resource_type) {event}"
-            )
-        return PutSpecEvent(**json_event)
-    elif json_event["event_type"] == "DELETE":
-        return DeleteSpecEvent(**json_event)
+    try:
+        if json_event["event_type"] == "PUT":
+            if json_event["resource_type"] == "AGENT":
+                json_event["spec"] = AgentSpec(**json_event["spec"])
+            elif json_event["resource_type"] == "TASK":
+                json_event["spec"] = TaskSpec(**json_event["spec"])
+            elif json_event["resource_type"] == "CONVERSATION":
+                json_event["spec"] = ConversationSpec(**json_event["spec"])
+            else:
+                raise errors.InvalidEventError(
+                    f"Invalid Spec Event (resource_type) {event}"
+                )
+            return PutSpecEvent(**json_event)
+        elif json_event["event_type"] == "DELETE":
+            return DeleteSpecEvent(**json_event)
+    except Exception as e:
+        logger.error("Error deserializing Spec Event %s", e)
     raise errors.InvalidEventError(f"Invalid Spec Event (event_type) {event}")

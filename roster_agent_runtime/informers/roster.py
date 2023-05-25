@@ -11,9 +11,12 @@ from roster_agent_runtime.informers.events.spec import (
 )
 from roster_agent_runtime.listeners.base import EventListener
 from roster_agent_runtime.logs import app_logger
-from roster_agent_runtime.models.agent import AgentSpec
-from roster_agent_runtime.models.conversation import ConversationSpec
-from roster_agent_runtime.models.task import TaskSpec
+from roster_agent_runtime.models.agent import AgentResource, AgentSpec
+from roster_agent_runtime.models.conversation import (
+    ConversationResource,
+    ConversationSpec,
+)
+from roster_agent_runtime.models.task import TaskResource, TaskSpec
 
 logger = app_logger()
 
@@ -56,22 +59,23 @@ class RosterInformer(Informer[RosterSpecEvent]):
             try:
                 async with session.get(self.url_config.agents_url) as resp:
                     for agent in await resp.json():
-                        self.agents[agent["name"]] = AgentSpec(**agent)
-            except (aiohttp.ClientError, ValueError):
+                        spec = AgentResource(**agent).spec
+                        self.agents[spec.name] = spec
+            except (aiohttp.ClientError, TypeError):
                 logger.error("(roster-spec) Failed to load initial agents")
             try:
                 async with session.get(self.url_config.tasks_url) as resp:
                     for task in await resp.json():
-                        self.tasks[task["name"]] = TaskSpec(**task)
-            except (aiohttp.ClientError, ValueError):
+                        spec = TaskResource(**task).spec
+                        self.tasks[spec.name] = spec
+            except (aiohttp.ClientError, TypeError):
                 logger.error("(roster-spec) Failed to load initial tasks")
             try:
                 async with session.get(self.url_config.conversations_url) as resp:
                     for conversation in await resp.json():
-                        self.conversations[conversation["name"]] = ConversationSpec(
-                            **conversation
-                        )
-            except (aiohttp.ClientError, ValueError):
+                        spec = ConversationResource(**conversation).spec
+                        self.conversations[spec.name] = spec
+            except (aiohttp.ClientError, TypeError):
                 logger.error("(roster-spec) Failed to load initial conversations")
 
     async def setup(self):
@@ -104,6 +108,7 @@ class RosterInformer(Informer[RosterSpecEvent]):
             logger.warn("(roster-spec) Unknown resource type: %s", event)
 
     def _handle_spec_event(self, event: RosterSpecEvent):
+        logger.debug("(roster-spec) Received Spec event: %s", event)
         if event.event_type == "PUT":
             self._handle_put_spec_event(event)
         elif event.event_type == "DELETE":
@@ -123,19 +128,3 @@ class RosterInformer(Informer[RosterSpecEvent]):
             *self.tasks.values(),
             *self.conversations.values(),
         ]
-
-    # TODO: Consider removing this from the Informer interface entirely
-    def get(self, id: str) -> RosterSpec:
-        try:
-            return self.agents[id]
-        except KeyError:
-            pass
-        try:
-            return self.tasks[id]
-        except KeyError:
-            pass
-        try:
-            return self.conversations[id]
-        except KeyError:
-            pass
-        raise KeyError(id)

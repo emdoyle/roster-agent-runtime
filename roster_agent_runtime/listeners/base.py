@@ -22,15 +22,24 @@ class EventListener:
 
     async def listen(self):
         async with aiohttp.ClientSession() as session:
+            logger.debug("(evt-listen) Listening to events from %s", self.url)
             async with session.get(self.url) as resp:
                 async for line in resp.content:
                     if line == b"\n":
                         continue
+                    line = line.decode("utf-8").strip()
+                    logger.debug("(evt-listen) [%s] Line: %s", self.url, line)
                     for handler in self.handlers:
-                        line = line.decode("utf-8")
-                        for middleware in self.middleware:
-                            line = await middleware(line)
-                        await handler(line)
+                        try:
+                            for middleware in self.middleware:
+                                line = middleware(line)
+                            handler(line)
+                        except Exception:
+                            logger.error(
+                                "(evt-listen) [%s] Error handling event: %s",
+                                self.url,
+                                line,
+                            )
 
     def run_as_task(self) -> asyncio.Task:
         if self.task is not None:

@@ -326,7 +326,7 @@ class DockerAgentExecutor(AgentExecutor):
         try:
             port = self._get_service_port_for_agent(agent_name)
             self.task_listeners[agent_name] = EventListener(
-                url=f"http://localhost:{port}/task_events",
+                url=f"http://localhost:{port}/task-events",
                 middleware=self.task_informer_middleware,
                 handlers=[self._task_event_handler(agent_name)],
             )
