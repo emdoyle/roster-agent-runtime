@@ -43,7 +43,7 @@ class AgentControllerStore:
                 resource_type=Resource.AGENT,
                 event_type=EventType.PUT,
                 name=agent_name,
-                data=agent_status,
+                status=agent_status.dict(),
             )
         )
 
@@ -69,7 +69,7 @@ class AgentControllerStore:
                 resource_type=Resource.TASK,
                 event_type=EventType.PUT,
                 name=task_name,
-                data=task_status,
+                status=task_status.dict(),
             )
         )
 

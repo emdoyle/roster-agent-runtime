@@ -7,8 +7,8 @@ from roster_agent_runtime.models.task import TaskStatus
 
 
 class Resource(Enum):
-    AGENT = "Agent"
-    TASK = "Task"
+    AGENT = "AGENT"
+    TASK = "TASK"
 
 
 class EventType(Enum):
@@ -20,14 +20,23 @@ class ControllerStatusEvent(BaseModel):
     resource_type: Resource
     event_type: EventType
     name: str
-    data: Optional[BaseModel] = None
+    status: Optional[dict] = None
+
+    class Config:
+        use_enum_values = True
 
     def get_agent_status(self) -> AgentStatus:
-        if self.resource_type == Resource.AGENT and isinstance(self.data, AgentStatus):
-            return self.data
+        try:
+            if self.resource_type == Resource.AGENT and self.status is not None:
+                return AgentStatus(**self.status)
+        except TypeError:
+            raise ValueError("Invalid resource_type or data type for agent status")
         raise ValueError("Invalid resource_type or data type for agent status")
 
     def get_task_status(self) -> TaskStatus:
-        if self.resource_type == Resource.TASK and isinstance(self.data, TaskStatus):
-            return self.data
+        try:
+            if self.resource_type == Resource.TASK and self.status is not None:
+                return TaskStatus(**self.status)
+        except TypeError:
+            raise ValueError("Invalid resource_type or data type for task status")
         raise ValueError("Invalid resource_type or data type for task status")

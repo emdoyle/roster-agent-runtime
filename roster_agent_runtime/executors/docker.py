@@ -31,7 +31,7 @@ import docker
 logger = app_logger()
 
 
-def get_host_ip(network_name="bridge", client=None):
+def get_docker_host_ip(network_name="bridge", client=None):
     os_name = platform.system()
 
     if os_name == "Linux":
@@ -136,8 +136,8 @@ class DockerAgentExecutor(AgentExecutor):
             raise errors.RosterError("Could not connect to Docker daemon.") from e
 
     @property
-    def host_ip(self):
-        return get_host_ip(client=self.client)
+    def docker_host_ip(self):
+        return get_docker_host_ip(client=self.client)
 
     def get_agent_lock(self, name: str):
         key = f"agent:{name}"
@@ -370,7 +370,7 @@ class DockerAgentExecutor(AgentExecutor):
                 network_mode=network_mode,
                 ports={"8000/tcp": None},
                 environment={
-                    "ROSTER_RUNTIME_IP": self.host_ip,
+                    "ROSTER_RUNTIME_IP": self.docker_host_ip,
                     "ROSTER_AGENT_NAME": agent.name,
                     "ROSTER_AGENT_PORT": "8000",
                     # TODO: figure out non-roster environment variables
