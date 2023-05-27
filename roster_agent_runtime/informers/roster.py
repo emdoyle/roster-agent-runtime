@@ -5,17 +5,12 @@ from pydantic import BaseModel, Field
 from roster_agent_runtime import settings
 from roster_agent_runtime.informers.base import Informer
 from roster_agent_runtime.informers.events.spec import (
-    RosterSpec,
-    RosterSpecEvent,
-    deserialize_spec_event,
-)
+    RosterResourceEvent, RosterSpec, deserialize_resource_event)
 from roster_agent_runtime.listeners.base import EventListener
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.agent import AgentResource, AgentSpec
-from roster_agent_runtime.models.conversation import (
-    ConversationResource,
-    ConversationSpec,
-)
+from roster_agent_runtime.models.conversation import (ConversationResource,
+                                                      ConversationSpec)
 from roster_agent_runtime.models.task import TaskResource, TaskSpec
 
 logger = app_logger()
@@ -41,18 +36,23 @@ class RosterAPIURLConfig(BaseModel):
         validate_assignment = True
 
 
-class RosterInformer(Informer[RosterSpecEvent]):
-    def __init__(self, url_config: Optional[RosterAPIURLConfig] = None):
+class RosterInformer(Informer[RosterResourceEvent]):
+    def __init__(
+        self,
+        url_config: Optional[RosterAPIURLConfig] = None,
+        event_params: Optional[dict] = None,
+    ):
         self.agents: dict[str, AgentSpec] = {}
         self.tasks: dict[str, TaskSpec] = {}
         self.conversations: dict[str, ConversationSpec] = {}
         self.url_config: RosterAPIURLConfig = url_config or RosterAPIURLConfig()
         self.roster_listener: EventListener = EventListener(
             self.url_config.events_url,
-            middleware=[deserialize_spec_event],
+            params=event_params or {"status_changes": False},
+            middleware=[deserialize_resource_event],
             handlers=[self._handle_spec_event],
         )
-        self.event_listeners: list[Callable[[RosterSpecEvent], None]] = []
+        self.event_listeners: list[Callable[[RosterResourceEvent], None]] = []
 
     async def _load_initial_specs(self):
         async with aiohttp.ClientSession() as session:
@@ -87,17 +87,17 @@ class RosterInformer(Informer[RosterSpecEvent]):
         logger.debug("Tearing down Roster Informer")
         self.roster_listener.stop()
 
-    def _handle_put_spec_event(self, event: RosterSpecEvent):
+    def _handle_put_spec_event(self, event: RosterResourceEvent):
         if event.resource_type == "AGENT":
-            self.agents[event.name] = event.spec
+            self.agents[event.name] = event.resource.spec
         elif event.resource_type == "TASK":
-            self.tasks[event.name] = event.spec
+            self.tasks[event.name] = event.resource.spec
         elif event.resource_type == "CONVERSATION":
-            self.conversations[event.name] = event.spec
+            self.conversations[event.name] = event.resource.spec
         else:
             logger.warn("(roster-spec) Unknown resource type: %s", event)
 
-    def _handle_delete_spec_event(self, event: RosterSpecEvent):
+    def _handle_delete_spec_event(self, event: RosterResourceEvent):
         if event.resource_type == "AGENT":
             self.agents.pop(event.name, None)
         elif event.resource_type == "TASK":
@@ -107,7 +107,7 @@ class RosterInformer(Informer[RosterSpecEvent]):
         else:
             logger.warn("(roster-spec) Unknown resource type: %s", event)
 
-    def _handle_spec_event(self, event: RosterSpecEvent):
+    def _handle_spec_event(self, event: RosterResourceEvent):
         logger.debug("(roster-spec) Received Spec event: %s", event)
         if event.event_type == "PUT":
             self._handle_put_spec_event(event)
@@ -119,7 +119,7 @@ class RosterInformer(Informer[RosterSpecEvent]):
         for listener in self.event_listeners:
             listener(event)
 
-    def add_event_listener(self, callback: Callable[[RosterSpecEvent], None]):
+    def add_event_listener(self, callback: Callable[[RosterResourceEvent], None]):
         self.event_listeners.append(callback)
 
     def list(self) -> list[RosterSpec]:

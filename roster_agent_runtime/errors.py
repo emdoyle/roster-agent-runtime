@@ -14,8 +14,10 @@ class CreateAgentError(RosterError):
         self,
         message="An error occurred when attempting to create an Agent.",
         details=None,
+        agent=None,
     ):
         super().__init__(message, details)
+        self.agent = agent
 
 
 class AgentFailedToStartError(CreateAgentError):

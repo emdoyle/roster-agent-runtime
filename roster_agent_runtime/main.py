@@ -1,5 +1,6 @@
 import asyncio
 
+from roster_agent_runtime import settings
 from roster_agent_runtime.controllers.agent import get_agent_controller
 
 
@@ -7,6 +8,7 @@ def run():
     controller = get_agent_controller()
 
     loop = asyncio.get_event_loop()
+    loop.set_debug(settings.DEBUG)
 
     try:
         loop.run_until_complete(controller.setup())

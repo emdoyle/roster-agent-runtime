@@ -321,7 +321,9 @@ class DockerAgentExecutor(AgentExecutor):
 
     def setup_task_listener_for_agent(self, agent_name: str):
         if agent_name in self.task_listeners:
-            raise errors.AgentAlreadyExistsError(agent=agent_name)
+            raise errors.CreateAgentError(
+                "Task listener already exists for agent.", agent=agent_name
+            )
 
         try:
             port = self._get_service_port_for_agent(agent_name)
@@ -422,8 +424,7 @@ class DockerAgentExecutor(AgentExecutor):
         try:
             self.task_listeners.pop(name).stop()
         except (KeyError, RuntimeError):
-            # NOTE: listener was not started
-            #   should log warning here
+            logger.warn("Could not stop task listener for agent %s.", name)
             pass
 
         if not running_agent.status.container:
@@ -652,6 +653,11 @@ class DockerAgentExecutor(AgentExecutor):
         # Otherwise, we should remove the agent status and notify listeners.
         logger.debug("(docker-evt) Agent killed %s", agent_name)
         self.store.delete_agent(agent_name, notify=True)
+        try:
+            self.task_listeners.pop(agent_name).stop()
+        except (KeyError, RuntimeError):
+            logger.warn("Could not stop task listener for agent %s.", agent_name)
+            pass
 
     async def _handle_docker_event(self, event: dict):
         logger.debug("(docker-evt) Received: %s", event)

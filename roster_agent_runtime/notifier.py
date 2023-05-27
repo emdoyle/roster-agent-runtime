@@ -28,7 +28,10 @@ class RosterNotifier:
             logger.debug("(rstr-notif) Sending status event %s", payload)
             try:
                 async with aiohttp.ClientSession() as session:
-                    await session.post(self.url, json=payload, raise_for_status=True)
+                    async with session.post(
+                        self.url, json=payload, raise_for_status=True
+                    ):
+                        pass
             except Exception as e:
                 logger.warn(
                     "(rstr-notif) Failed to send status event to %s\n%s", self.url, e

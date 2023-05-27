@@ -1,4 +1,5 @@
 import asyncio
+import urllib.parse
 from typing import Callable, Optional
 
 import aiohttp
@@ -11,9 +12,12 @@ class EventListener:
     def __init__(
         self,
         url: str,
+        params: Optional[dict] = None,
         middleware: Optional[list[Callable]] = None,
         handlers: Optional[list[Callable]] = None,
     ):
+        if params:
+            url = url + "?" + urllib.parse.urlencode(params, doseq=True)
         self.url = url
         self.middleware = middleware or []
         self.handlers = handlers or []

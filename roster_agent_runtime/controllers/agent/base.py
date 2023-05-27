@@ -10,7 +10,7 @@ from roster_agent_runtime.executors.events import (
     ExecutorStatusEvent,
     Resource,
 )
-from roster_agent_runtime.informers.events.spec import RosterSpecEvent
+from roster_agent_runtime.informers.events.spec import RosterResourceEvent
 from roster_agent_runtime.informers.roster import RosterInformer
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
@@ -143,17 +143,17 @@ class AgentController:
         for status in self.executor.list_tasks():
             self.store.put_task(status.name, status)
 
-    def _handle_put_spec_event(self, event: RosterSpecEvent):
+    def _handle_put_spec_event(self, event: RosterResourceEvent):
         if event.resource_type == "AGENT":
-            self.desired.agents[event.name] = event.spec
+            self.desired.agents[event.name] = event.resource.spec
         elif event.resource_type == "TASK":
-            self.desired.tasks[event.name] = event.spec
+            self.desired.tasks[event.name] = event.resource.spec
         elif event.resource_type == "CONVERSATION":
-            self.desired.conversations[event.name] = event.spec
+            self.desired.conversations[event.name] = event.resource.spec
         else:
             logger.warn("(agent-control) Unknown resource type: %s", event)
 
-    def _handle_delete_spec_event(self, event: RosterSpecEvent):
+    def _handle_delete_spec_event(self, event: RosterResourceEvent):
         if event.resource_type == "AGENT":
             self.desired.agents.pop(event.name, None)
         elif event.resource_type == "TASK":
@@ -163,7 +163,7 @@ class AgentController:
         else:
             logger.warn("(agent-control) Unknown resource type: %s", event)
 
-    async def __safe_handle_spec_event(self, event: RosterSpecEvent):
+    async def _serial_handle_spec_event(self, event: RosterResourceEvent):
         async with self.lock:
             logger.info("Received spec event: %s", event)
             if event.event_type == "PUT":
@@ -174,8 +174,8 @@ class AgentController:
                 logger.warn("(agent-control) Unknown event: %s", event)
         self.reconciliation_queue.put_nowait(True)
 
-    def _handle_spec_event(self, event: RosterSpecEvent):
-        asyncio.create_task(self.__safe_handle_spec_event(event))
+    def _handle_spec_event(self, event: RosterResourceEvent):
+        asyncio.create_task(self._serial_handle_spec_event(event))
 
     def setup_spec_listeners(self):
         self.roster_informer.add_event_listener(self._handle_spec_event)
