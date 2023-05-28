@@ -1,5 +1,4 @@
 import asyncio
-from typing import Optional
 
 from roster_agent_runtime import errors
 from roster_agent_runtime.controllers.agent.store import AgentControllerStore
@@ -18,24 +17,6 @@ from roster_agent_runtime.models.task import TaskSpec, TaskStatus
 from roster_agent_runtime.notifier import RosterNotifier
 
 logger = app_logger()
-
-AGENT_CONTROLLER: Optional["AgentController"] = None
-
-
-def get_agent_controller() -> "AgentController":
-    global AGENT_CONTROLLER
-    if AGENT_CONTROLLER is not None:
-        return AGENT_CONTROLLER
-
-    # This should be configurable in settings
-    from roster_agent_runtime.executors.docker import DockerAgentExecutor
-
-    AGENT_CONTROLLER = AgentController(
-        executor=DockerAgentExecutor(),
-        roster_informer=RosterInformer(),
-        roster_notifier=RosterNotifier(),
-    )
-    return AGENT_CONTROLLER
 
 
 # Consider separating TaskController from AgentController
