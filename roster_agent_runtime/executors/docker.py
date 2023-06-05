@@ -375,6 +375,7 @@ class DockerAgentExecutor(AgentExecutor):
                     "ROSTER_RUNTIME_IP": self.docker_host_ip,
                     "ROSTER_AGENT_NAME": agent.name,
                     "ROSTER_AGENT_PORT": "8000",
+                    "ROSTER_AGENT_LOG_FILE": "/var/log/roster-agent.log",
                     # TODO: figure out non-roster environment variables
                     "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
                 },
