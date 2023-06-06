@@ -33,37 +33,3 @@ class ConversationSpec(BaseModel):
                 "context": {"task": "my_task"},
             }
         }
-
-
-class ConversationStatus(BaseModel):
-    name: str = Field(description="The name of the conversation.")
-    status: str = Field(description="The status of the conversation.")
-    history: list[ConversationMessage] = Field(
-        default_factory=list, description="The conversation history."
-    )
-
-    class Config:
-        validate_assignment = True
-        schema_extra = {
-            "example": {
-                "name": "my_conversation",
-                "status": "in_progress",
-                "history": [
-                    ConversationMessage.Config.schema_extra["example"],
-                ],
-            }
-        }
-
-
-class ConversationResource(BaseModel):
-    spec: ConversationSpec = Field(description="The specification of the conversation.")
-    status: ConversationStatus = Field(description="The status of the conversation.")
-
-    class Config:
-        validate_assignment = True
-        schema_extra = {
-            "example": {
-                "spec": ConversationSpec.Config.schema_extra["example"],
-                "status": ConversationStatus.Config.schema_extra["example"],
-            }
-        }

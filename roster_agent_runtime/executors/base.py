@@ -4,9 +4,9 @@ from typing import Callable
 from roster_agent_runtime.executors.events import ExecutorStatusEvent
 from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
 from roster_agent_runtime.models.conversation import ConversationMessage
-from roster_agent_runtime.models.task import TaskSpec, TaskStatus
 
 
+# This can be thought of like an AgentPool
 class AgentExecutor(ABC):
     @abstractmethod
     async def setup(self):
@@ -35,26 +35,6 @@ class AgentExecutor(ABC):
     @abstractmethod
     async def delete_agent(self, name: str) -> None:
         """delete agent"""
-
-    @abstractmethod
-    async def initiate_task(self, task: TaskSpec) -> TaskStatus:
-        """start task"""
-
-    @abstractmethod
-    async def update_task(self, task: TaskSpec) -> TaskStatus:
-        """update task"""
-
-    @abstractmethod
-    def list_tasks(self) -> list[TaskStatus]:
-        """list tasks"""
-
-    @abstractmethod
-    def get_task(self, name: str) -> TaskStatus:
-        """get task"""
-
-    @abstractmethod
-    async def end_task(self, name: str) -> None:
-        """end task"""
 
     @abstractmethod
     async def prompt(

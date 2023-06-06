@@ -8,8 +8,7 @@ from roster_agent_runtime.controllers.events.status import (
 )
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.agent import AgentStatus
-from roster_agent_runtime.models.controller import CurrentState, DesiredState
-from roster_agent_runtime.models.task import TaskStatus
+from roster_agent_runtime.models.controller import CurrentAgentState, DesiredAgentState
 
 logger = app_logger()
 
@@ -21,8 +20,8 @@ class AgentControllerStore:
             list[Callable[[ControllerStatusEvent], None]]
         ] = None,
     ):
-        self.desired = DesiredState()
-        self.current = CurrentState()
+        self.desired = DesiredAgentState()
+        self.current = CurrentAgentState()
         self.status_listeners = status_listeners or []
 
     def add_status_listener(self, listener: Callable[[ControllerStatusEvent], None]):
@@ -60,29 +59,3 @@ class AgentControllerStore:
             )
         except KeyError:
             raise errors.AgentNotFoundError(agent_name)
-
-    def put_task(self, task_name: str, task_status: TaskStatus):
-        logger.debug("(store) put task: %s", task_name)
-        self.current.tasks[task_name] = task_status
-        self._notify_status_listeners(
-            ControllerStatusEvent(
-                resource_type=Resource.TASK,
-                event_type=EventType.PUT,
-                name=task_name,
-                status=task_status.dict(),
-            )
-        )
-
-    def delete_task(self, task_name: str):
-        logger.debug("(store) delete task: %s", task_name)
-        try:
-            self.current.tasks.pop(task_name)
-            self._notify_status_listeners(
-                ControllerStatusEvent(
-                    resource_type=Resource.TASK,
-                    event_type=EventType.DELETE,
-                    name=task_name,
-                )
-            )
-        except KeyError:
-            raise errors.TaskNotFoundError(task_name)

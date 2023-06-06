@@ -13,14 +13,11 @@ from roster_agent_runtime.informers.events.spec import RosterResourceEvent
 from roster_agent_runtime.informers.roster import RosterInformer
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
-from roster_agent_runtime.models.task import TaskSpec, TaskStatus
 from roster_agent_runtime.notifier import RosterNotifier
 
 logger = app_logger()
 
 
-# Consider separating TaskController from AgentController
-# main thing is the Executor relationship
 class AgentController:
     def __init__(
         self,
@@ -95,7 +92,8 @@ class AgentController:
                 logger.debug("(agent-control) Reconciliation loop cancelled.")
                 break
             except Exception as e:
-                logger.error("(agent-control) Error during reconciliation: %s", e)
+                logger.debug("(agent-control) Error during reconciliation: %s", e)
+                logger.error("Error during Agent Controller reconciliation.")
 
     async def setup_roster_connection(self):
         # Setup Informer for Roster API resources (desired state)
@@ -114,35 +112,29 @@ class AgentController:
         for spec in self.roster_informer.list():
             if isinstance(spec, AgentSpec):
                 self.desired.agents[spec.name] = spec
-            elif isinstance(spec, TaskSpec):
-                self.desired.tasks[spec.name] = spec
 
     def load_initial_status(self):
         # Load full current state from Executor
         for status in self.executor.list_agents():
             self.store.put_agent(status.name, status)
-        for status in self.executor.list_tasks():
-            self.store.put_task(status.name, status)
 
     def _handle_put_spec_event(self, event: RosterResourceEvent):
         if event.resource_type == "AGENT":
             self.desired.agents[event.name] = event.resource.spec
-        elif event.resource_type == "TASK":
-            self.desired.tasks[event.name] = event.resource.spec
-        elif event.resource_type == "CONVERSATION":
-            self.desired.conversations[event.name] = event.resource.spec
         else:
-            logger.warn("(agent-control) Unknown resource type: %s", event)
+            logger.warn(
+                "(agent-control) Unknown spec event resource type from Roster API: %s",
+                event.resource_type,
+            )
 
     def _handle_delete_spec_event(self, event: RosterResourceEvent):
         if event.resource_type == "AGENT":
             self.desired.agents.pop(event.name, None)
-        elif event.resource_type == "TASK":
-            self.desired.tasks.pop(event.name, None)
-        elif event.resource_type == "CONVERSATION":
-            self.desired.conversations.pop(event.name, None)
         else:
-            logger.warn("(agent-control) Unknown resource type: %s", event)
+            logger.warn(
+                "(agent-control) Unknown spec event resource type from Roster API: %s",
+                event.resource_type,
+            )
 
     async def _serial_handle_spec_event(self, event: RosterResourceEvent):
         async with self.lock:
@@ -164,15 +156,6 @@ class AgentController:
     def setup_status_listeners(self):
         self.executor.add_event_listener(self._handle_status_event)
 
-    def _handle_task_status_event(self, event: ExecutorStatusEvent):
-        try:
-            # Assuming all full updates for Task
-            task = event.get_task_status()
-            self.store.put_task(event.name, task)
-        except ValueError:
-            return
-        self.reconciliation_queue.put_nowait(True)
-
     def _handle_agent_status_event(self, event: ExecutorStatusEvent):
         if event.event_type == EventType.PUT:
             try:
@@ -190,10 +173,11 @@ class AgentController:
     def _handle_status_event(self, event: ExecutorStatusEvent):
         if event.resource_type == Resource.AGENT:
             self._handle_agent_status_event(event)
-        elif event.resource_type == Resource.TASK:
-            self._handle_task_status_event(event)
         else:
-            logger.warn("(agent-control) Unknown status event resource type: %s", event)
+            logger.warn(
+                "(agent-control) Unknown status event resource type from executor: %s",
+                event,
+            )
 
     def _notify_roster_status_event(self, event: ControllerStatusEvent):
         self.roster_notifier.push_event(event)
@@ -201,10 +185,7 @@ class AgentController:
     async def reconcile(self):
         async with self.lock:
             logger.info("Controller reconciling...")
-            # this is for global reconciliation
-            # we reconcile sequentially since Tasks depend on Agents
             await self.reconcile_agents()
-            await self.reconcile_tasks()
             logger.info("Controller reconciled.")
 
     @staticmethod
@@ -237,31 +218,6 @@ class AgentController:
                 await self.delete_agent(agent.name)
         logger.debug("(rec-agents) Final agents: %s", self.current.agents)
 
-    @staticmethod
-    def task_matches_spec(task: TaskStatus, spec: TaskSpec):
-        return task.name == spec.name and task.agent_name == spec.agent_name
-
-    async def reconcile_tasks(self):
-        logger.debug("(rec-tasks) Reconciling tasks...")
-        logger.debug("(rec-tasks) Current tasks: %s", self.current.tasks)
-        logger.debug("(rec-tasks) Desired tasks: %s", self.desired.tasks)
-        for name, spec in self.desired.tasks.items():
-            if spec.agent_name not in self.current.agents:
-                logger.warn(
-                    "(rec-tasks) Agent %s not found, skipping task %s",
-                    spec.agent_name,
-                    name,
-                )
-                continue
-            if name not in self.current.tasks:
-                await self.initiate_task(spec)
-            elif not self.task_matches_spec(self.current.tasks[name], spec):
-                await self.update_task(spec)
-        for name, task in self.current.tasks.items():
-            if name not in self.desired.tasks:
-                await self.delete_task(task.name)
-        logger.debug("(rec-tasks) Final tasks: %s", self.current.tasks)
-
     async def create_agent(self, agent: AgentSpec) -> AgentStatus:
         if agent.name in self.current.agents:
             raise errors.AgentAlreadyExistsError(agent=agent.name)
@@ -293,49 +249,4 @@ class AgentController:
             self.store.delete_agent(name)
             logger.info("Deleted agent %s", name)
         except errors.AgentNotFoundError:
-            pass
-
-        # cascade delete to owned tasks
-        current_tasks = list(self.current.tasks.items())
-        for task_name, task in current_tasks:
-            if task.agent_name != name:
-                self.store.delete_task(task.name)
-
-    async def initiate_task(self, task: TaskSpec) -> TaskStatus:
-        if task.name in self.current.tasks:
-            raise errors.TaskAlreadyExistsError(task=task.name)
-        if task.agent_name not in self.current.agents:
-            raise errors.AgentNotFoundError(agent=task.agent_name)
-
-        self.store.put_task(task.name, await self.executor.initiate_task(task))
-        status = self.current.tasks[task.name]
-        logger.info("Initiated task %s", task.name)
-        return status
-
-    async def update_task(self, task: TaskSpec) -> TaskStatus:
-        if task.name not in self.current.tasks:
-            raise errors.TaskNotFoundError(task=task.name)
-        if task.agent_name not in self.current.agents:
-            raise errors.AgentNotFoundError(agent=task.agent_name)
-
-        self.store.put_task(task.name, await self.executor.update_task(task))
-        status = self.current.tasks[task.name]
-        logger.info("Updated task %s", task.name)
-        return status
-
-    def list_tasks(self) -> list[TaskStatus]:
-        return list(self.current.tasks.values())
-
-    def get_task(self, name: str) -> TaskStatus:
-        try:
-            return self.current.tasks[name]
-        except KeyError as e:
-            raise errors.TaskNotFoundError(task=name) from e
-
-    async def delete_task(self, name: str) -> None:
-        try:
-            await self.executor.end_task(name)
-            self.store.delete_task(name)
-            logger.info("Deleted task %s", name)
-        except errors.TaskNotFoundError:
             pass

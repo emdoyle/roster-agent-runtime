@@ -3,12 +3,10 @@ from typing import Optional
 
 from pydantic import BaseModel
 from roster_agent_runtime.models.agent import AgentStatus
-from roster_agent_runtime.models.task import TaskStatus
 
 
 class Resource(Enum):
     AGENT = "AGENT"
-    TASK = "TASK"
 
 
 class EventType(Enum):
@@ -32,11 +30,3 @@ class ControllerStatusEvent(BaseModel):
         except TypeError:
             raise ValueError("Invalid resource_type or data type for agent status")
         raise ValueError("Invalid resource_type or data type for agent status")
-
-    def get_task_status(self) -> TaskStatus:
-        try:
-            if self.resource_type == Resource.TASK and self.status is not None:
-                return TaskStatus(**self.status)
-        except TypeError:
-            raise ValueError("Invalid resource_type or data type for task status")
-        raise ValueError("Invalid resource_type or data type for task status")
