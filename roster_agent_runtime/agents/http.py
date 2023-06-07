@@ -57,6 +57,19 @@ class HttpAgentHandle(AgentHandle):
                 f"Could not execute task {name} on agent {self.name}."
             ) from e
 
+    async def update_task(self, name: str, description: str) -> None:
+        try:
+            response = await self._request(
+                "PATCH",
+                f"{self.url}/tasks/{name}",
+                json={"name": name, "description": description},
+            )
+            assert response.status == 200
+        except AssertionError as e:
+            raise errors.TaskError(
+                f"Could not update task {name} on agent {self.name}."
+            ) from e
+
     async def list_tasks(self) -> list[TaskStatus]:
         try:
             response = await self._request("GET", f"{self.url}/tasks")

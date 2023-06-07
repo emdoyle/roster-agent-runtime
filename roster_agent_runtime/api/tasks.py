@@ -16,6 +16,14 @@ async def initiate_task_on_agent(name: str, task: str, description: str):
         raise HTTPException(status_code=404, detail=e.message)
 
 
+@router.patch("/agent/{name}/tasks", tags=["AgentResource", "Tasks"])
+async def update_task_on_agent(name: str, task: str, description: str):
+    try:
+        return await get_agent_service().update_task_on_agent(name, task, description)
+    except errors.AgentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=e.message)
+
+
 @router.get("/agent/{name}/tasks", tags=["AgentResource", "Tasks"])
 async def list_tasks_on_agent(name: str):
     try:

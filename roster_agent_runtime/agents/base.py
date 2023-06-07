@@ -16,6 +16,10 @@ class AgentHandle(ABC):
         """Execute a task on the agent"""
 
     @abstractmethod
+    async def update_task(self, name: str, description: str) -> None:
+        """Update the description of a task"""
+
+    @abstractmethod
     async def list_tasks(self) -> list[TaskStatus]:
         """List the tasks running on the agent"""
 
