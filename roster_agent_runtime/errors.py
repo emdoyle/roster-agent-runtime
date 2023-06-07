@@ -106,55 +106,6 @@ class TaskNotFoundError(TaskError):
         super().__init__(message, details, task)
 
 
-class ConversationError(RosterError):
-    """Base exception class for Conversation errors."""
-
-    def __init__(
-        self,
-        message="An unexpected error occurred for the Conversation.",
-        details=None,
-        conversation=None,
-    ):
-        super().__init__(message, details)
-        self.conversation = conversation
-
-
-class ConversationAlreadyExistsError(ConversationError):
-    """Exception raised when a Conversation already exists."""
-
-    def __init__(
-        self,
-        message="A Conversation with this ID already exists.",
-        details=None,
-        conversation=None,
-    ):
-        super().__init__(message, details, conversation)
-
-
-class ConversationNotFoundError(ConversationError):
-    """Exception raised when a Conversation is not found."""
-
-    def __init__(
-        self,
-        message="The specified Conversation was not found.",
-        details=None,
-        conversation=None,
-    ):
-        super().__init__(message, details, conversation)
-
-
-class ConversationNotAvailableError(ConversationError):
-    """Exception raised when a Conversation is not available."""
-
-    def __init__(
-        self,
-        message="The specified Conversation is not available.",
-        details=None,
-        conversation=None,
-    ):
-        super().__init__(message, details, conversation)
-
-
 class InvalidRequestError(RosterError):
     """Exception raised when an invalid request is made."""
 

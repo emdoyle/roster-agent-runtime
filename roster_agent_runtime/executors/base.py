@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Callable
 
+from roster_agent_runtime.agents.base import AgentHandle
 from roster_agent_runtime.executors.events import ExecutorStatusEvent
 from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
-from roster_agent_runtime.models.conversation import ConversationMessage
 
 
 # This can be thought of like an AgentPool
@@ -37,13 +37,8 @@ class AgentExecutor(ABC):
         """delete agent"""
 
     @abstractmethod
-    async def prompt(
-        self,
-        name: str,
-        history: list[ConversationMessage],
-        message: ConversationMessage,
-    ) -> ConversationMessage:
-        """prompt agent in conversation"""
+    def get_agent_handle(self, name: str) -> AgentHandle:
+        """get agent handle"""
 
     @abstractmethod
     def add_event_listener(self, listener: Callable[[ExecutorStatusEvent], None]):

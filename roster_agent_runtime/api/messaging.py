@@ -9,7 +9,7 @@ router = APIRouter()
 logger = app_logger()
 
 
-@router.post("/agent/{name}/chat", tags=["AgentResource", "Command"])
+@router.post("/agent/{name}/chat", tags=["AgentResource", "Messaging"])
 async def chat_prompt_agent(
     name: str,
     history: list[ConversationMessage],

@@ -6,6 +6,7 @@ from typing import Callable, Optional
 import aiohttp
 from pydantic import BaseModel, Field
 from roster_agent_runtime import errors
+from roster_agent_runtime.agents import AgentHandle, HttpAgentHandle
 from roster_agent_runtime.executors.base import AgentExecutor
 from roster_agent_runtime.executors.events import ExecutorStatusEvent
 from roster_agent_runtime.executors.store import AgentExecutorStore
@@ -20,7 +21,6 @@ from roster_agent_runtime.models.agent import (
     AgentSpec,
     AgentStatus,
 )
-from roster_agent_runtime.models.conversation import ConversationMessage
 
 import docker
 
@@ -362,34 +362,9 @@ class DockerAgentExecutor(AgentExecutor):
         async with self.get_agent_lock(name):
             await self._delete_agent(name)
 
-    async def prompt(
-        self,
-        name: str,
-        history: list[ConversationMessage],
-        message: ConversationMessage,
-    ) -> ConversationMessage:
-        complete_chat = [message, *history]
+    def get_agent_handle(self, name: str) -> AgentHandle:
         port = self._get_service_port_for_agent(name)
-        url = f"http://localhost:{port}/chat"
-
-        payload = [message.dict() for message in complete_chat]
-
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.post(
-                    url, json=payload, raise_for_status=True
-                ) as response:
-                    try:
-                        response = await response.json()
-                        conversation_message = ConversationMessage(**response)
-                    except (TypeError, aiohttp.ContentTypeError) as e:
-                        raise errors.RosterError(
-                            f"Could not parse response from agent {name}."
-                        ) from e
-            except aiohttp.ClientError as e:
-                raise errors.RosterError(f"Could not connect to agent {name}.") from e
-
-        return conversation_message
+        return HttpAgentHandle.build(name, f"http://localhost:{port}")
 
     def _find_agent_by_container_name(
         self, container_name: str
