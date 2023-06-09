@@ -2,7 +2,7 @@ import aiohttp
 import pydantic
 from roster_agent_runtime import errors
 from roster_agent_runtime.models.conversation import ConversationMessage
-from roster_agent_runtime.models.task import TaskStatus
+from roster_agent_runtime.models.task import TaskAssignment, TaskStatus
 
 from .base import AgentHandle
 
@@ -44,12 +44,18 @@ class HttpAgentHandle(AgentHandle):
                 f"Could not parse response from agent {self.name}."
             ) from e
 
-    async def execute_task(self, name: str, description: str) -> None:
+    async def execute_task(
+        self, name: str, description: str, assignment: TaskAssignment
+    ) -> None:
         try:
             response = await self._request(
                 "POST",
                 f"{self.url}/tasks",
-                json={"name": name, "description": description},
+                json={
+                    "name": name,
+                    "description": description,
+                    "assignment": assignment.dict(),
+                },
             )
             assert response.status == 200
         except AssertionError as e:

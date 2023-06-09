@@ -25,7 +25,7 @@ class AgentController:
         roster_informer: RosterInformer,
         roster_notifier: RosterNotifier,
     ):
-        # TODO: properly abstract executor per-Agent
+        # TODO: support multiple AgentExecutors/Pools
         self.executor = executor
         self.roster_informer = roster_informer
         self.roster_notifier = roster_notifier

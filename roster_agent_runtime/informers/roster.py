@@ -30,7 +30,7 @@ class RosterAPIURLConfig(BaseModel):
 
 # This is only watching Agent resource changes for now,
 # and is only used by the AgentController
-class RosterInformer(Informer[RosterResourceEvent]):
+class RosterInformer(Informer[RosterSpec, RosterResourceEvent]):
     DEFAULT_EVENT_PARAMS = {
         # We are only interested in Spec events, not Status events
         "status_changes": False,

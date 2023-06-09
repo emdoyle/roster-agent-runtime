@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from roster_agent_runtime import errors
 from roster_agent_runtime.logs import app_logger
+from roster_agent_runtime.models.task import TaskAssignment
 from roster_agent_runtime.singletons import get_agent_service
 
 router = APIRouter()
@@ -9,7 +10,9 @@ logger = app_logger()
 
 
 @router.post("/agent/{name}/tasks", tags=["AgentResource", "Tasks"])
-async def initiate_task_on_agent(name: str, task: str, description: str):
+async def initiate_task_on_agent(
+    name: str, task: str, description: str, assignment: TaskAssignment
+):
     try:
         return await get_agent_service().initiate_task_on_agent(name, task, description)
     except errors.AgentNotFoundError as e:

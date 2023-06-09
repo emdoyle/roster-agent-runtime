@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from roster_agent_runtime.models.conversation import ConversationMessage
-from roster_agent_runtime.models.task import TaskStatus
+from roster_agent_runtime.models.task import TaskAssignment, TaskStatus
 
 
 class AgentHandle(ABC):
@@ -12,7 +12,9 @@ class AgentHandle(ABC):
         """Respond to a prompt"""
 
     @abstractmethod
-    async def execute_task(self, name: str, description: str) -> None:
+    async def execute_task(
+        self, name: str, description: str, assignment: TaskAssignment
+    ) -> None:
         """Execute a task on the agent"""
 
     @abstractmethod
