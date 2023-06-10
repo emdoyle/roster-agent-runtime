@@ -52,7 +52,7 @@ class HttpAgentHandle(AgentHandle):
                 "POST",
                 f"{self.url}/tasks",
                 json={
-                    "name": name,
+                    "task": name,
                     "description": description,
                     "assignment": assignment.dict(),
                 },
