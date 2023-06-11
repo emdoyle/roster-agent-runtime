@@ -32,13 +32,18 @@ class HttpAgentHandle(AgentHandle):
             raise errors.TaskError(f"Could not connect to agent {self.name}.") from e
 
     async def chat(
-        self, chat_history: list[ConversationMessage]
+        self, chat_history: list[ConversationMessage], team_name: str = ""
     ) -> ConversationMessage:
         try:
+            payload = {
+                "messages": [message.dict() for message in chat_history],
+            }
+            if team_name:
+                payload["team"] = team_name
             response_data = await self._request(
                 "POST",
                 f"{self.url}/chat",
-                json=[message.dict() for message in chat_history],
+                json=payload,
             )
             return ConversationMessage(**response_data)
         except pydantic.ValidationError as e:

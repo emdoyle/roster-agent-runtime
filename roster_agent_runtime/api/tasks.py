@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from roster_agent_runtime import errors
 from roster_agent_runtime.logs import app_logger
-from roster_agent_runtime.models.task import InitiateTaskArgs
+from roster_agent_runtime.models.api.tasks import InitiateTaskArgs
 from roster_agent_runtime.singletons import get_agent_service
 
 router = APIRouter()
