@@ -14,13 +14,16 @@ class AgentService:
     async def chat_prompt_agent(
         self,
         name: str,
+        identity: str,
         team: str,
         role: str,
         history: list[ConversationMessage],
         message: ConversationMessage,
-    ) -> ConversationMessage:
+    ) -> str:
         agent = self._get_agent_handle(name)
-        return await agent.chat(team=team, role=role, chat_history=[*history, message])
+        return await agent.chat(
+            identity=identity, team=team, role=role, chat_history=[*history, message]
+        )
 
     async def initiate_task_on_agent(
         self, name: str, task: str, description: str, assignment: TaskAssignment

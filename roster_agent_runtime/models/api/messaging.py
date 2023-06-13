@@ -4,6 +4,7 @@ from ..conversation import ConversationMessage
 
 
 class ChatPromptAgentArgs(BaseModel):
+    identity: str = Field(description="The name of the agent.")
     team: str = Field(description="The name of the team which the agent is on.")
     role: str = Field(
         description="The name of the role on the team which identifies the agent."
@@ -19,6 +20,7 @@ class ChatPromptAgentArgs(BaseModel):
         validate_assignment = True
         schema_extra = {
             "example": {
+                "identity": "my_identity",
                 "team": "my_team",
                 "role": "my_role",
                 "history": [ConversationMessage.Config.schema_extra["example"]],

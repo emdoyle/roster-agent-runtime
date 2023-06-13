@@ -32,10 +32,15 @@ class HttpAgentHandle(AgentHandle):
             raise errors.TaskError(f"Could not connect to agent {self.name}.") from e
 
     async def chat(
-        self, team: str, role: str, chat_history: list[ConversationMessage]
-    ) -> ConversationMessage:
+        self,
+        identity: str,
+        team: str,
+        role: str,
+        chat_history: list[ConversationMessage],
+    ) -> str:
         try:
             payload = {
+                "identity": identity,
                 "team": team,
                 "role": role,
                 "messages": [message.dict() for message in chat_history],
@@ -45,8 +50,8 @@ class HttpAgentHandle(AgentHandle):
                 f"{self.url}/chat",
                 json=payload,
             )
-            return ConversationMessage(**response_data)
-        except pydantic.ValidationError as e:
+            return response_data["message"]
+        except (KeyError, pydantic.ValidationError) as e:
             raise errors.TaskError(
                 f"Could not parse chat response from agent {self.name}."
             ) from e

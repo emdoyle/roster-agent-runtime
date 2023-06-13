@@ -7,8 +7,12 @@ from roster_agent_runtime.models.task import TaskAssignment, TaskStatus
 class AgentHandle(ABC):
     @abstractmethod
     async def chat(
-        self, team: str, role: str, chat_history: list[ConversationMessage]
-    ) -> ConversationMessage:
+        self,
+        identity: str,
+        team: str,
+        role: str,
+        chat_history: list[ConversationMessage],
+    ) -> str:
         """Respond to a prompt"""
 
     @abstractmethod

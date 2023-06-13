@@ -10,10 +10,11 @@ logger = app_logger()
 
 
 @router.post("/agent/{name}/chat", tags=["AgentResource", "Messaging"])
-async def chat_prompt_agent(name: str, prompt: ChatPromptAgentArgs):
+async def chat_prompt_agent(name: str, prompt: ChatPromptAgentArgs) -> str:
     try:
         return await get_agent_service().chat_prompt_agent(
             name=name,
+            identity=prompt.identity,
             team=prompt.team,
             role=prompt.role,
             history=prompt.history,
