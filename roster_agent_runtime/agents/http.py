@@ -32,14 +32,14 @@ class HttpAgentHandle(AgentHandle):
             raise errors.TaskError(f"Could not connect to agent {self.name}.") from e
 
     async def chat(
-        self, chat_history: list[ConversationMessage], team_name: str = ""
+        self, team: str, role: str, chat_history: list[ConversationMessage]
     ) -> ConversationMessage:
         try:
             payload = {
+                "team": team,
+                "role": role,
                 "messages": [message.dict() for message in chat_history],
             }
-            if team_name:
-                payload["team"] = team_name
             response_data = await self._request(
                 "POST",
                 f"{self.url}/chat",

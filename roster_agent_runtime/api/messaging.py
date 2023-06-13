@@ -13,7 +13,11 @@ logger = app_logger()
 async def chat_prompt_agent(name: str, prompt: ChatPromptAgentArgs):
     try:
         return await get_agent_service().chat_prompt_agent(
-            name, prompt.history, prompt.message, team=prompt.team
+            name=name,
+            team=prompt.team,
+            role=prompt.role,
+            history=prompt.history,
+            message=prompt.message,
         )
     except errors.AgentNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
