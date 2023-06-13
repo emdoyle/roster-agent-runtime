@@ -28,6 +28,7 @@ class TaskSpec(BaseModel):
 class TaskAssignment(BaseModel):
     team_name: str = Field(description="The name of the team.")
     role_name: str = Field(description="The name of the role.")
+    identity_name: str = Field(description="The name of the identity.")
     agent_name: str = Field(description="The name of the agent.")
 
     class Config:
@@ -36,6 +37,7 @@ class TaskAssignment(BaseModel):
             "example": {
                 "team_name": "my_team",
                 "role_name": "my_role",
+                "identity_name": "my_identity",
                 "agent_name": "my_agent",
             }
         }
