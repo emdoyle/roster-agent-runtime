@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import AsyncIterator
 
 from roster_agent_runtime.models.conversation import ConversationMessage
 from roster_agent_runtime.models.task import TaskAssignment, TaskStatus
@@ -36,3 +37,7 @@ class AgentHandle(ABC):
     @abstractmethod
     async def cancel_task(self, task: str) -> None:
         """Cancel a task"""
+
+    @abstractmethod
+    def activity_stream(self) -> AsyncIterator[dict]:
+        """Stream activities from the agent"""

@@ -1,10 +1,16 @@
+import json
+from typing import AsyncIterator
+
 import aiohttp
 import pydantic
 from roster_agent_runtime import errors
 from roster_agent_runtime.models.conversation import ConversationMessage
 from roster_agent_runtime.models.task import TaskAssignment, TaskStatus
 
+from ..logs import app_logger
 from .base import AgentHandle
+
+logger = app_logger()
 
 
 class HttpAgentHandle(AgentHandle):
@@ -96,3 +102,25 @@ class HttpAgentHandle(AgentHandle):
 
     async def cancel_task(self, task: str) -> None:
         await self._request("DELETE", f"{self.url}/tasks/{task}")
+
+    async def activity_stream(self) -> AsyncIterator[dict]:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{self.url}/activity-stream") as resp:
+                async for line in resp.content:
+                    if line == b"\n":
+                        continue
+                    logger.debug(
+                        "(agent-handle) Received activity event (agent %s) %s",
+                        self.name,
+                        line,
+                    )
+                    decoded = line.decode("utf-8").strip()
+                    try:
+                        yield json.loads(json.loads(decoded))
+                    except json.JSONDecodeError:
+                        logger.debug(
+                            "(agent-handle) Skipping malformed activity event (agent %s) %s",
+                            self.name,
+                            decoded,
+                        )
+                        pass

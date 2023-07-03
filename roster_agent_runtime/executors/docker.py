@@ -112,6 +112,10 @@ class DockerAgentExecutor(AgentExecutor):
                 handlers=[self._handle_docker_event],
             )
 
+            # These tasks handle the activity stream of each Agent
+            # (pushing things like Thoughts, Actions to long-term storage)
+            self.activity_stream_tasks: dict[str, asyncio.Task] = {}
+
             # Synchronization primitives for concurrency control
             self._resource_locks: dict[str, asyncio.Lock] = {}
             self._expected_events: list[ExpectedStatusEvent] = []
@@ -183,7 +187,7 @@ class DockerAgentExecutor(AgentExecutor):
 
     def _add_agent_from_container(
         self, container: "docker.models.containers.Container"
-    ):
+    ) -> AgentStatus:
         agent_container = serialize_agent_container(container)
         try:
             agent_name = container.labels[self.ROSTER_CONTAINER_LABEL]
@@ -191,20 +195,22 @@ class DockerAgentExecutor(AgentExecutor):
             raise errors.RosterError(
                 f"Could not restore agent from container {container.name}."
             )
-        self.store.put_agent(
-            AgentStatus(
-                name=agent_name,
-                container=agent_container,
-                status=agent_container.status,
-            )
+        agent_status = AgentStatus(
+            name=agent_name,
+            container=agent_container,
+            status=agent_container.status,
         )
+        self.store.put_agent(agent_status)
+        return agent_status
 
     async def _restore_agent_state(self):
         containers = self.client.containers.list(
             filters={"label": self.ROSTER_CONTAINER_LABEL}
         )
         for container in containers:
-            self._add_agent_from_container(container)
+            agent_status = self._add_agent_from_container(container)
+            if agent_status.name not in self.activity_stream_tasks:
+                await self._start_activity_stream_watcher(agent_status.name)
 
     async def setup(self):
         logger.debug("(docker) Setup started.")
@@ -221,9 +227,12 @@ class DockerAgentExecutor(AgentExecutor):
         logger.debug("(docker) Setup complete.")
 
     async def teardown(self):
-        logger.debug("(docker) Setup started.")
+        logger.debug("(docker) Teardown started.")
         try:
             self.docker_events_listener.stop()
+            for task in self.activity_stream_tasks.values():
+                if not task.cancelled():
+                    task.cancel()
         except Exception as e:
             raise errors.RosterError("Could not teardown Docker executor.") from e
         logger.debug("(docker) Teardown complete.")
@@ -257,6 +266,32 @@ class DockerAgentExecutor(AgentExecutor):
             await asyncio.sleep(interval)
         raise errors.AgentFailedToStartError(
             "Agent healthcheck did not succeed.", agent=agent_name
+        )
+
+    async def _watch_activity_stream(self, agent_name: str):
+        logger.debug(
+            "(agent-exec) Activity stream acquiring handle for agent %s", agent_name
+        )
+        handle = self.get_agent_handle(agent_name)
+        logger.debug(
+            "(agent-exec) Activity stream acquired handle for agent %s", agent_name
+        )
+        async for activity_event in handle.activity_stream():
+            logger.info("Activity Event: %s", activity_event)
+        logger.warn(
+            "(agent-exec) Activity stream exited iteration for agent %s", agent_name
+        )
+
+    async def _start_activity_stream_watcher(self, agent_name: str):
+        await self._wait_for_agent_healthy(agent_name)
+        logger.debug(
+            "(agent-exec) Starting activity stream watcher for agent %s", agent_name
+        )
+        self.activity_stream_tasks[agent_name] = asyncio.create_task(
+            self._watch_activity_stream(agent_name)
+        )
+        logger.debug(
+            "(agent-exec) Activity stream watcher task created for agent %s", agent_name
         )
 
     async def _create_agent(
@@ -302,12 +337,15 @@ class DockerAgentExecutor(AgentExecutor):
             )
             container.reload()
         except docker.errors.APIError as e:
+            # We no longer expect the docker start event since we assume startup failed
             self._pop_expected_event(agent_name=agent.name, action="start")
             raise errors.RosterError(f"Could not create agent {agent.name}.") from e
 
         self._add_agent_from_container(container)
         if wait_for_healthy:
             await self._wait_for_agent_healthy(agent.name)
+
+        await self._start_activity_stream_watcher(agent.name)
 
         return self.store.agents[agent.name]
 
@@ -340,6 +378,12 @@ class DockerAgentExecutor(AgentExecutor):
 
         if not agent.container:
             raise errors.AgentNotFoundError(agent=name)
+
+        if (
+            name in self.activity_stream_tasks
+            and not self.activity_stream_tasks[name].cancelled()
+        ):
+            self.activity_stream_tasks[name].cancel()
 
         try:
             container = self.client.containers.get(agent.container.id)
