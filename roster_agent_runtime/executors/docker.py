@@ -5,7 +5,7 @@ from typing import Callable, Optional
 
 import aiohttp
 from pydantic import BaseModel, Field
-from roster_agent_runtime import errors
+from roster_agent_runtime import errors, settings
 from roster_agent_runtime.agents import AgentHandle, HttpAgentHandle
 from roster_agent_runtime.executors.base import AgentExecutor
 from roster_agent_runtime.executors.events import ExecutorStatusEvent
@@ -115,6 +115,7 @@ class DockerAgentExecutor(AgentExecutor):
             # These tasks handle the activity stream of each Agent
             # (pushing things like Thoughts, Actions to long-term storage)
             self.activity_stream_tasks: dict[str, asyncio.Task] = {}
+            self.roster_activity_url = settings.ROSTER_API_ACTIVITY_URL
 
             # Synchronization primitives for concurrency control
             self._resource_locks: dict[str, asyncio.Lock] = {}
@@ -268,6 +269,16 @@ class DockerAgentExecutor(AgentExecutor):
             "Agent healthcheck did not succeed.", agent=agent_name
         )
 
+    async def _notify_roster_activity_event(self, event: dict):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    self.roster_activity_url, json=event
+                ) as response:
+                    assert response.status == 200
+        except (AssertionError, aiohttp.ClientError) as e:
+            logger.warn("(agent-exec) Failed to notify Roster of activity event %s", e)
+
     async def _watch_activity_stream(self, agent_name: str):
         logger.debug(
             "(agent-exec) Activity stream acquiring handle for agent %s", agent_name
@@ -277,7 +288,8 @@ class DockerAgentExecutor(AgentExecutor):
             "(agent-exec) Activity stream acquired handle for agent %s", agent_name
         )
         async for activity_event in handle.activity_stream():
-            logger.info("Activity Event: %s", activity_event)
+            logger.debug("(agent-exec) Sending activity event %s", activity_event)
+            await self._notify_roster_activity_event(activity_event)
         logger.warn(
             "(agent-exec) Activity stream exited iteration for agent %s", agent_name
         )
