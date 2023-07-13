@@ -19,10 +19,17 @@ class AgentService:
         role: str,
         history: list[ConversationMessage],
         message: ConversationMessage,
+        execution_id: str = "",
+        execution_type: str = "",
     ) -> str:
         agent = self._get_agent_handle(name)
         return await agent.chat(
-            identity=identity, team=team, role=role, chat_history=[*history, message]
+            identity=identity,
+            team=team,
+            role=role,
+            chat_history=[*history, message],
+            execution_id=execution_id,
+            execution_type=execution_type,
         )
 
     async def initiate_task_on_agent(

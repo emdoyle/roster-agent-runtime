@@ -7,6 +7,7 @@ from roster_agent_runtime import errors
 from roster_agent_runtime.models.conversation import ConversationMessage
 from roster_agent_runtime.models.task import TaskAssignment, TaskStatus
 
+from ..constants import EXECUTION_ID_HEADER, EXECUTION_TYPE_HEADER
 from ..logs import app_logger
 from .base import AgentHandle
 
@@ -43,8 +44,15 @@ class HttpAgentHandle(AgentHandle):
         team: str,
         role: str,
         chat_history: list[ConversationMessage],
+        execution_id: str = "",
+        execution_type: str = "",
     ) -> str:
         try:
+            headers = {}
+            if execution_id:
+                headers[EXECUTION_ID_HEADER] = execution_id
+            if execution_type:
+                headers[EXECUTION_TYPE_HEADER] = execution_type
             payload = {
                 "identity": identity,
                 "team": team,
@@ -55,6 +63,7 @@ class HttpAgentHandle(AgentHandle):
                 "POST",
                 f"{self.url}/chat",
                 json=payload,
+                headers=headers,
             )
             return response_data["message"]
         except (KeyError, pydantic.ValidationError) as e:

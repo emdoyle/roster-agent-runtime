@@ -13,6 +13,8 @@ class AgentHandle(ABC):
         team: str,
         role: str,
         chat_history: list[ConversationMessage],
+        execution_id: str = "",
+        execution_type: str = "",
     ) -> str:
         """Respond to a prompt"""
 
