@@ -17,13 +17,15 @@ async def initiate_task_on_agent(name: str, args: InitiateTaskArgs):
         )
     except errors.AgentNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
+    except errors.TaskError as e:
+        raise HTTPException(status_code=500, detail=e.message)
 
 
 @router.patch("/agent/{name}/tasks", tags=["AgentResource", "Tasks"])
 async def update_task_on_agent(name: str, task: str, description: str):
     try:
         return await get_agent_service().update_task_on_agent(name, task, description)
-    except errors.AgentNotFoundError as e:
+    except (errors.AgentNotFoundError, errors.TaskError) as e:
         raise HTTPException(status_code=404, detail=e.message)
 
 
@@ -31,7 +33,7 @@ async def update_task_on_agent(name: str, task: str, description: str):
 async def list_tasks_on_agent(name: str):
     try:
         return await get_agent_service().list_tasks_on_agent(name)
-    except errors.AgentNotFoundError as e:
+    except (errors.AgentNotFoundError, errors.TaskError) as e:
         raise HTTPException(status_code=404, detail=e.message)
 
 
@@ -39,7 +41,7 @@ async def list_tasks_on_agent(name: str):
 async def get_task_on_agent(name: str, task: str):
     try:
         return await get_agent_service().get_task_on_agent(name, task)
-    except errors.AgentNotFoundError as e:
+    except (errors.AgentNotFoundError, errors.TaskError) as e:
         raise HTTPException(status_code=404, detail=e.message)
 
 
@@ -47,5 +49,5 @@ async def get_task_on_agent(name: str, task: str):
 async def cancel_task_on_agent(name: str, task: str):
     try:
         return await get_agent_service().cancel_task_on_agent(name, task)
-    except errors.AgentNotFoundError as e:
+    except (errors.AgentNotFoundError, errors.TaskError) as e:
         raise HTTPException(status_code=404, detail=e.message)
