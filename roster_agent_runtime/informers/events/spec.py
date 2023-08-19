@@ -5,12 +5,11 @@ from pydantic import BaseModel, Field
 from roster_agent_runtime import errors
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.agent import AgentSpec
-from roster_agent_runtime.models.conversation import ConversationSpec
 from roster_agent_runtime.models.task import TaskSpec
 
 logger = app_logger()
 
-RosterSpec = Union[AgentSpec, TaskSpec, ConversationSpec]
+RosterSpec = Union[AgentSpec, TaskSpec]
 
 
 class Resource(BaseModel):
@@ -71,10 +70,6 @@ def deserialize_resource_event(event: str) -> RosterResourceEvent:
                 )
             elif json_event["resource_type"] == "TASK":
                 json_event["resource"]["spec"] = TaskSpec(
-                    **json_event["resource"]["spec"]
-                )
-            elif json_event["resource_type"] == "CONVERSATION":
-                json_event["resource"]["spec"] = ConversationSpec(
                     **json_event["resource"]["spec"]
                 )
             else:
