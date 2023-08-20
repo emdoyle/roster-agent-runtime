@@ -1,41 +1,59 @@
 from typing import Optional
 
 from pydantic import BaseModel, Field
+from roster_agent_runtime.models.common import TypedArgument
 
 
-class AgentCapabilities(BaseModel):
-    network_access: bool = Field(
-        False, description="Whether the agent has network access or not."
+class Action(BaseModel):
+    name: str = Field(description="A name to identify the action.")
+    description: str = Field(description="A description of the action.")
+    inputs: list[TypedArgument] = Field(
+        default_factory=list, description="The inputs to the action."
     )
-    messaging_access: bool = Field(
-        False, description="Whether the agent can message other agents or not."
+    outputs: list[TypedArgument] = Field(
+        default_factory=list, description="The outputs of the action."
     )
 
     class Config:
         validate_assignment = True
         schema_extra = {
             "example": {
-                "network_access": False,
-                "messaging_access": False,
-            },
+                "name": "ActionName",
+                "description": "A description of the action.",
+                "inputs": [
+                    TypedArgument.Config.schema_extra["example"],
+                    TypedArgument.Config.schema_extra["example"],
+                ],
+                "outputs": [
+                    TypedArgument.Config.schema_extra["example"],
+                    TypedArgument.Config.schema_extra["example"],
+                ],
+            }
         }
 
 
 class AgentSpec(BaseModel):
-    image: str = Field(description="The container image to be used for this agent.")
     name: str = Field(description="A name to identify the agent.")
-    capabilities: AgentCapabilities = Field(
-        default_factory=lambda: AgentCapabilities(),
-        description="The capabilities of the agent.",
+    image: str = Field(description="A path to the image to be used for this agent.")
+    tag: str = Field(
+        description="A tag to identify the version of the image to be used for this agent.",
+        default="latest",
+    )
+    actions: list[Action] = Field(
+        default_factory=list, description="The actions implemented by this agent."
     )
 
     class Config:
         validate_assignment = True
         schema_extra = {
             "example": {
-                "image": "my_image:latest",
                 "name": "Alice",
-                "capabilities": AgentCapabilities.Config.schema_extra["example"],
+                "image": ".local/agent",
+                "tag": "latest",
+                "actions": [
+                    Action.Config.schema_extra["example"],
+                    Action.Config.schema_extra["example"],
+                ],
             }
         }
 
@@ -52,9 +70,6 @@ class AgentContainer(BaseModel):
     labels: Optional[dict[str, str]] = Field(
         default=None, description="The labels of the container."
     )
-    capabilities: AgentCapabilities = Field(
-        description="The capabilities of the container."
-    )
 
     class Config:
         validate_assignment = True
@@ -65,7 +80,6 @@ class AgentContainer(BaseModel):
                 "name": "my_container_name",
                 "status": "running",
                 "labels": {"my_label": "my_value"},
-                "capabilities": AgentCapabilities.Config.schema_extra["example"],
             }
         }
 

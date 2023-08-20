@@ -15,12 +15,7 @@ from roster_agent_runtime.listeners.docker import (
     DockerEventListener,
 )
 from roster_agent_runtime.logs import app_logger
-from roster_agent_runtime.models.agent import (
-    AgentCapabilities,
-    AgentContainer,
-    AgentSpec,
-    AgentStatus,
-)
+from roster_agent_runtime.models.agent import AgentContainer, AgentSpec, AgentStatus
 
 import docker
 
@@ -51,17 +46,12 @@ def get_docker_host_ip(network_name="bridge", client=None):
 def serialize_agent_container(
     container: "docker.models.containers.Container",
 ) -> AgentContainer:
-    capabilities = AgentCapabilities(
-        network_access=container.attrs["HostConfig"]["NetworkMode"] == "default",
-        messaging_access=container.labels.get("messaging_access", False) == "True",
-    )
     return AgentContainer(
         id=container.id,
         name=container.name,
         image=container.image.tags[0] if container.image.tags else "UNKNOWN",
         status=container.status,
         labels=container.labels,
-        capabilities=capabilities,
     )
 
 

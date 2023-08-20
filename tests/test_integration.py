@@ -5,7 +5,7 @@ import pytest_asyncio
 from roster_agent_runtime.controllers.agent import AgentController
 from roster_agent_runtime.executors import DockerAgentExecutor
 from roster_agent_runtime.informers.roster import RosterInformer
-from roster_agent_runtime.models.agent import AgentCapabilities, AgentSpec, AgentStatus
+from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
 
 
 @pytest.fixture
@@ -35,11 +35,7 @@ async def manage_controller(controller):
 
 AGENT_TESTCASES = [
     (
-        AgentSpec(
-            image="langchain-roster",
-            name="Alice",
-            capabilities=AgentCapabilities(network_access=True),
-        ),
+        AgentSpec(image="langchain-roster", name="Alice"),
         AgentStatus(name="Alice", status="running"),
     ),
 ]

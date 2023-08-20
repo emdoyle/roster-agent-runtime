@@ -3,12 +3,7 @@ from typing import Callable
 from roster_agent_runtime import errors
 from roster_agent_runtime.executors.base import AgentExecutor
 from roster_agent_runtime.executors.events import ExecutorStatusEvent
-from roster_agent_runtime.models.agent import (
-    AgentCapabilities,
-    AgentContainer,
-    AgentSpec,
-    AgentStatus,
-)
+from roster_agent_runtime.models.agent import AgentContainer, AgentSpec, AgentStatus
 from roster_agent_runtime.models.conversation import ConversationMessage
 
 
@@ -19,7 +14,6 @@ def get_mock_container(image: str = "langchain-roster") -> AgentContainer:
         image=image,
         status="running",
         labels={},
-        capabilities=AgentCapabilities(network_access=True),
     )
 
 
