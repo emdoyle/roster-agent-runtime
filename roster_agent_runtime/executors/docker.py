@@ -156,7 +156,6 @@ class DockerAgentExecutor(AgentExecutor):
     def _labels_for_agent(self, agent: AgentSpec) -> dict:
         return {
             self.ROSTER_CONTAINER_LABEL: agent.name,
-            "messaging_access": str(agent.capabilities.messaging_access),
         }
 
     def _get_service_port_for_agent(self, name: str) -> int:
@@ -310,11 +309,6 @@ class DockerAgentExecutor(AgentExecutor):
         except docker.errors.APIError as e:
             raise errors.RosterError("Could not pull image.") from e
 
-        if agent.capabilities.network_access:
-            network_mode = "default"
-        else:
-            network_mode = None
-
         try:
             self._push_expected_events(
                 ExpectedStatusEvent.docker_start(
@@ -326,7 +320,7 @@ class DockerAgentExecutor(AgentExecutor):
                 detach=True,
                 labels=self._labels_for_agent(agent),
                 # TODO: figure out user-defined network to allow specific service access only
-                network_mode=network_mode,
+                network_mode="default",
                 ports={"8000/tcp": None},
                 environment={
                     "ROSTER_RUNTIME_IP": self.docker_host_ip,

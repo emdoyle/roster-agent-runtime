@@ -198,7 +198,7 @@ class AgentController:
                 agent.container.image == spec.image
                 or agent.container.image.split(":")[0] == spec.image
             )
-            return image_matches and agent.container.capabilities == spec.capabilities
+            return image_matches
         # Should probably raise if there is no container
         # but this implies reconsidering whether it is optional
         return True
