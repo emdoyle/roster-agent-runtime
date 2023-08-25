@@ -3,6 +3,7 @@ from typing import Optional
 from roster_agent_runtime.controllers.agent import AgentController
 from roster_agent_runtime.executors import AgentExecutor
 from roster_agent_runtime.informers.roster import RosterInformer
+from roster_agent_runtime.messaging.rabbitmq import RabbitMQClient
 from roster_agent_runtime.notifier import RosterNotifier
 from roster_agent_runtime.services.agent import AgentService
 
@@ -11,6 +12,7 @@ ROSTER_NOTIFIER: Optional[RosterNotifier] = None
 AGENT_EXECUTOR: Optional[AgentExecutor] = None
 AGENT_CONTROLLER: Optional[AgentController] = None
 AGENT_SERVICE: Optional[AgentService] = None
+RABBITMQ_CLIENT: Optional["RabbitMQClient"] = None
 
 
 def get_roster_informer() -> RosterInformer:
@@ -64,3 +66,12 @@ def get_agent_service() -> AgentService:
 
     AGENT_SERVICE = AgentService(executor=get_agent_executor())
     return AGENT_SERVICE
+
+
+def get_rabbitmq() -> "RabbitMQClient":
+    global RABBITMQ_CLIENT
+    if RABBITMQ_CLIENT is not None:
+        return RABBITMQ_CLIENT
+
+    RABBITMQ_CLIENT = RabbitMQClient()
+    return RABBITMQ_CLIENT
