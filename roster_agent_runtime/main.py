@@ -6,7 +6,6 @@ from uvicorn import Config, Server
 
 from roster_agent_runtime import constants, settings
 from roster_agent_runtime.api.messaging import router as messaging_router
-from roster_agent_runtime.api.tasks import router as tasks_router
 from roster_agent_runtime.singletons import get_agent_controller
 
 
@@ -26,7 +25,6 @@ async def lifespan(app: FastAPI):
 async def serve_api():
     app = FastAPI(title="Roster Runtime API", version="0.1.0", lifespan=lifespan)
     app.include_router(messaging_router, prefix=f"/{constants.API_VERSION}")
-    app.include_router(tasks_router, prefix=f"/{constants.API_VERSION}")
     config = Config(app=app, host="0.0.0.0", port=settings.PORT)
     server = Server(config)
     await server.serve()

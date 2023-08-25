@@ -7,7 +7,20 @@ class RosterError(Exception):
         self.details = details
 
 
-class CreateAgentError(RosterError):
+class AgentError(RosterError):
+    """Exception raised for agent-related errors."""
+
+    def __init__(
+        self,
+        message="An unexpected error occurred for the Agent.",
+        details=None,
+        agent=None,
+    ):
+        super().__init__(message, details)
+        self.agent = agent
+
+
+class CreateAgentError(AgentError):
     """Exception raised when an error occurs when creating an Agent."""
 
     def __init__(
@@ -20,7 +33,7 @@ class CreateAgentError(RosterError):
         self.agent = agent
 
 
-class AgentFailedToStartError(CreateAgentError):
+class AgentFailedToStartError(AgentError):
     """Exception raised when an Agent fails to start."""
 
     def __init__(
@@ -33,7 +46,7 @@ class AgentFailedToStartError(CreateAgentError):
         self.agent = agent
 
 
-class AgentAlreadyExistsError(CreateAgentError):
+class AgentAlreadyExistsError(AgentError):
     """Exception raised when an Agent already exists."""
 
     def __init__(
@@ -46,7 +59,7 @@ class AgentAlreadyExistsError(CreateAgentError):
         self.agent = agent
 
 
-class AgentImageNotFoundError(CreateAgentError):
+class AgentImageNotFoundError(AgentError):
     """Exception raised when an Agent image is not found."""
 
     def __init__(
@@ -59,7 +72,7 @@ class AgentImageNotFoundError(CreateAgentError):
         self.image = image
 
 
-class AgentNotFoundError(RosterError):
+class AgentNotFoundError(AgentError):
     """Exception raised when an Agent is not found."""
 
     def __init__(
@@ -67,43 +80,6 @@ class AgentNotFoundError(RosterError):
     ):
         super().__init__(message, details)
         self.agent = agent
-
-
-class TaskError(RosterError):
-    """Base exception class for Task errors."""
-
-    def __init__(
-        self,
-        message="An unexpected error occurred for the Task.",
-        details=None,
-        task=None,
-    ):
-        super().__init__(message, details)
-        self.task = task
-
-
-class TaskAlreadyExistsError(TaskError):
-    """Exception raised when a Task already exists."""
-
-    def __init__(
-        self,
-        message="A Task with this ID already exists.",
-        details=None,
-        task=None,
-    ):
-        super().__init__(message, details, task)
-
-
-class TaskNotFoundError(TaskError):
-    """Exception raised when a Task is not found."""
-
-    def __init__(
-        self,
-        message="The specified Task was not found.",
-        details=None,
-        task=None,
-    ):
-        super().__init__(message, details, task)
 
 
 class InvalidRequestError(RosterError):

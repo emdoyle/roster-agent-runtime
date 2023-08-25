@@ -2,9 +2,8 @@ from typing import Callable, Union
 
 from roster_agent_runtime.informers.base import Informer
 from roster_agent_runtime.models.agent import AgentSpec
-from roster_agent_runtime.models.task import TaskSpec
 
-RosterSpec = Union[AgentSpec, TaskSpec]
+RosterSpec = Union[AgentSpec]
 
 # NOTE the specs will break if fields are changed
 #   TODO: look into mocking library which can auto-generate mocks
@@ -12,11 +11,6 @@ RosterSpec = Union[AgentSpec, TaskSpec]
 INITIAL_MOCK_DATA = [
     AgentSpec(image="langchain-roster", name="Alice"),
     AgentSpec(image="langchain-roster", name="Bob"),
-    TaskSpec(
-        agent_name="Alice",
-        name="MyTask",
-        description="My task description",
-    ),
 ]
 
 
