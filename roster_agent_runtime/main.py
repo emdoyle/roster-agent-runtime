@@ -1,11 +1,10 @@
 import asyncio
-from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI
 from uvicorn import Config, Server
 
-from roster_agent_runtime import constants, settings
+from roster_agent_runtime import constants, errors, settings
 from roster_agent_runtime.api.messaging import router as messaging_router
 from roster_agent_runtime.singletons import get_agent_controller, get_rabbitmq
 
@@ -18,8 +17,7 @@ CONTROLLER_TASK: Optional[asyncio.Task] = None
 
 @app.on_event("startup")
 async def startup_event():
-    await controller.setup()
-    await rmq_client.setup()
+    await asyncio.gather(controller.setup(), rmq_client.setup())
     CONTROLLER_TASK = asyncio.create_task(controller.run())
 
 
@@ -28,8 +26,10 @@ async def shutdown_event():
     if CONTROLLER_TASK:
         CONTROLLER_TASK.cancel()
         await CONTROLLER_TASK
-    await controller.teardown()
-    await rmq_client.teardown()
+    try:
+        await asyncio.gather(controller.teardown(), rmq_client.teardown())
+    except errors.TeardownError as e:
+        logger.error(f"(shutdown_event): {e}")
 
 
 async def serve_api():
