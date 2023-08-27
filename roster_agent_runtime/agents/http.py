@@ -71,7 +71,9 @@ class HttpAgentHandle(AgentHandle):
                 f"Could not parse chat response from agent {self.name}."
             ) from e
 
-    async def trigger_action(self, action: str, inputs: dict[str, str]) -> None:
+    async def trigger_action(
+        self, action: str, inputs: dict[str, str], record_id: str, workflow: str
+    ) -> None:
         try:
             headers = {}
             if execution_id:
@@ -81,7 +83,12 @@ class HttpAgentHandle(AgentHandle):
             response_data = await self._request(
                 "POST",
                 f"{self.url}/trigger-action",
-                json={"action": action, "inputs": inputs},
+                json={
+                    "action": action,
+                    "inputs": inputs,
+                    "record_id": record_id,
+                    "workflow": workflow,
+                },
                 headers=headers,
             )
             return response_data["message"]

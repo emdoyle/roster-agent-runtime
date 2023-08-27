@@ -19,7 +19,9 @@ class AgentHandle(ABC):
         """Respond to a prompt"""
 
     @abstractmethod
-    async def trigger_action(self, action: str, inputs: dict[str, str]) -> None:
+    async def trigger_action(
+        self, action: str, inputs: dict[str, str], record_id: str, workflow: str
+    ) -> None:
         """Trigger an Action implemented by the Agent"""
 
     @abstractmethod
