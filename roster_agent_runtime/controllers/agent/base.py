@@ -1,4 +1,5 @@
 import asyncio
+from typing import Optional
 
 from roster_agent_runtime import errors
 from roster_agent_runtime.controllers.agent.store import AgentControllerStore
@@ -14,6 +15,7 @@ from roster_agent_runtime.informers.roster import RosterInformer
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
 from roster_agent_runtime.notifier import RosterNotifier
+from roster_agent_runtime.singletons import get_roster_informer, get_roster_notifier
 
 logger = app_logger()
 
@@ -22,13 +24,13 @@ class AgentController:
     def __init__(
         self,
         executor: AgentExecutor,
-        roster_informer: RosterInformer,
-        roster_notifier: RosterNotifier,
+        roster_informer: Optional[RosterInformer] = None,
+        roster_notifier: Optional[RosterNotifier] = None,
     ):
         # TODO: support multiple AgentExecutors/Pools
         self.executor = executor
-        self.roster_informer = roster_informer
-        self.roster_notifier = roster_notifier
+        self.roster_informer = roster_informer or get_roster_informer()
+        self.roster_notifier = roster_notifier or get_roster_notifier()
         self.store = AgentControllerStore(
             status_listeners=[self._notify_roster_status_event]
         )
@@ -49,7 +51,6 @@ class AgentController:
     async def setup(self):
         logger.debug("(agent-control) Setup started.")
         try:
-            self.roster_notifier.setup()
             await asyncio.gather(
                 self.setup_roster_connection(),
                 self.setup_executor_connection(),
@@ -71,10 +72,6 @@ class AgentController:
             if self.reconciliation_task is not None:
                 self.reconciliation_task.cancel()
                 self.reconciliation_task = None
-            self.roster_notifier.teardown()
-            await asyncio.gather(
-                self.roster_informer.teardown(), self.executor.teardown()
-            )
         except Exception as e:
             raise errors.TeardownError from e
         logger.debug("(agent-control) Teardown complete.")
@@ -98,13 +95,11 @@ class AgentController:
     async def setup_roster_connection(self):
         # Setup Informer for Roster API resources (desired state)
         self.setup_spec_listeners()
-        await self.roster_informer.setup()
         self.load_initial_spec()
 
     async def setup_executor_connection(self):
         # Setup listeners on Executor for resource status (current state)
         self.setup_status_listeners()
-        await self.executor.setup()
         self.load_initial_status()
 
     def load_initial_spec(self):

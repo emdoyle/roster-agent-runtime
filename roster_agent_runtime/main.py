@@ -6,18 +6,42 @@ from uvicorn import Config, Server
 
 from roster_agent_runtime import constants, errors, settings
 from roster_agent_runtime.api.messaging import router as messaging_router
-from roster_agent_runtime.singletons import get_agent_controller, get_rabbitmq
+from roster_agent_runtime.logs import app_logger
+from roster_agent_runtime.singletons import (
+    get_agent_controller,
+    get_agent_executor,
+    get_rabbitmq,
+    get_roster_informer,
+    get_roster_notifier,
+)
+
+logger = app_logger()
 
 app = FastAPI(title="Roster Runtime API", version="0.1.0")
 controller = get_agent_controller()
+informer = get_roster_informer()
+notifier = get_roster_notifier()
+executor = get_agent_executor()
 rmq_client = get_rabbitmq()
 
 CONTROLLER_TASK: Optional[asyncio.Task] = None
 
 
+# TODO: Dependency injection or context managers might be better pattern for setup/teardown
+#   - could solve issues like triggering clean teardown while setup in-progress
+
+
 @app.on_event("startup")
 async def startup_event():
+    # Notifier setup is synchronous, manages asyncio Task internally
+    # TODO: unnecessary complexity for questionable performance reasons, probably no need
+    notifier.setup()
+    # Informer and Executor are dependencies for Controller, so set them up first
+    await asyncio.gather(informer.setup(), executor.setup())
+    # Set up Controller and RabbitMQ client
     await asyncio.gather(controller.setup(), rmq_client.setup())
+    # Start core Controller loop
+    global CONTROLLER_TASK
     CONTROLLER_TASK = asyncio.create_task(controller.run())
 
 
@@ -27,7 +51,10 @@ async def shutdown_event():
         CONTROLLER_TASK.cancel()
         await CONTROLLER_TASK
     try:
+        # teardown in reverse of setup
         await asyncio.gather(controller.teardown(), rmq_client.teardown())
+        await asyncio.gather(informer.teardown(), executor.teardown())
+        notifier.teardown()
     except errors.TeardownError as e:
         logger.error(f"(shutdown_event): {e}")
 

@@ -1,44 +1,49 @@
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-from roster_agent_runtime.controllers.agent import AgentController
-from roster_agent_runtime.executors import AgentExecutor
-from roster_agent_runtime.informers.roster import RosterInformer
-from roster_agent_runtime.messaging.rabbitmq import RabbitMQClient
-from roster_agent_runtime.notifier import RosterNotifier
-from roster_agent_runtime.services.agent import AgentService
+if TYPE_CHECKING:
+    from roster_agent_runtime.controllers.agent import AgentController
+    from roster_agent_runtime.executors import AgentExecutor
+    from roster_agent_runtime.informers.roster import RosterInformer
+    from roster_agent_runtime.messaging.rabbitmq import RabbitMQClient
+    from roster_agent_runtime.notifier import RosterNotifier
+    from roster_agent_runtime.services.agent import AgentService
 
-ROSTER_INFORMER: Optional[RosterInformer] = None
-ROSTER_NOTIFIER: Optional[RosterNotifier] = None
-AGENT_EXECUTOR: Optional[AgentExecutor] = None
-AGENT_CONTROLLER: Optional[AgentController] = None
-AGENT_SERVICE: Optional[AgentService] = None
+ROSTER_INFORMER: Optional["RosterInformer"] = None
+ROSTER_NOTIFIER: Optional["RosterNotifier"] = None
+AGENT_EXECUTOR: Optional["AgentExecutor"] = None
+AGENT_CONTROLLER: Optional["AgentController"] = None
+AGENT_SERVICE: Optional["AgentService"] = None
 RABBITMQ_CLIENT: Optional["RabbitMQClient"] = None
 
 
-def get_roster_informer() -> RosterInformer:
+def get_roster_informer() -> "RosterInformer":
     global ROSTER_INFORMER
     if ROSTER_INFORMER is not None:
         return ROSTER_INFORMER
+
+    from roster_agent_runtime.informers.roster import RosterInformer
 
     ROSTER_INFORMER = RosterInformer()
     return ROSTER_INFORMER
 
 
-def get_roster_notifier() -> RosterNotifier:
+def get_roster_notifier() -> "RosterNotifier":
     global ROSTER_NOTIFIER
     if ROSTER_NOTIFIER is not None:
         return ROSTER_NOTIFIER
+
+    from roster_agent_runtime.notifier import RosterNotifier
 
     ROSTER_NOTIFIER = RosterNotifier()
     return ROSTER_NOTIFIER
 
 
-def get_agent_executor() -> AgentExecutor:
+def get_agent_executor() -> "AgentExecutor":
     global AGENT_EXECUTOR
     if AGENT_EXECUTOR is not None:
         return AGENT_EXECUTOR
 
-    # TODO: Make this configurable
+    # TODO: Make this configurable -- probably shouldn't be a singleton
     from roster_agent_runtime.executors.docker import DockerAgentExecutor
 
     AGENT_EXECUTOR = DockerAgentExecutor()
@@ -46,23 +51,25 @@ def get_agent_executor() -> AgentExecutor:
     return AGENT_EXECUTOR
 
 
-def get_agent_controller() -> AgentController:
+def get_agent_controller() -> "AgentController":
     global AGENT_CONTROLLER
     if AGENT_CONTROLLER is not None:
         return AGENT_CONTROLLER
 
+    from roster_agent_runtime.controllers.agent import AgentController
+
     AGENT_CONTROLLER = AgentController(
         executor=get_agent_executor(),
-        roster_informer=get_roster_informer(),
-        roster_notifier=get_roster_notifier(),
     )
     return AGENT_CONTROLLER
 
 
-def get_agent_service() -> AgentService:
+def get_agent_service() -> "AgentService":
     global AGENT_SERVICE
     if AGENT_SERVICE is not None:
         return AGENT_SERVICE
+
+    from roster_agent_runtime.services.agent import AgentService
 
     AGENT_SERVICE = AgentService(executor=get_agent_executor())
     return AGENT_SERVICE
@@ -72,6 +79,8 @@ def get_rabbitmq() -> "RabbitMQClient":
     global RABBITMQ_CLIENT
     if RABBITMQ_CLIENT is not None:
         return RABBITMQ_CLIENT
+
+    from roster_agent_runtime.messaging.rabbitmq import RabbitMQClient
 
     RABBITMQ_CLIENT = RabbitMQClient()
     return RABBITMQ_CLIENT
