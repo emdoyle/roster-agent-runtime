@@ -10,6 +10,7 @@ from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.singletons import (
     get_agent_controller,
     get_agent_executor,
+    get_message_router,
     get_rabbitmq,
     get_roster_informer,
     get_roster_notifier,
@@ -23,6 +24,7 @@ informer = get_roster_informer()
 notifier = get_roster_notifier()
 executor = get_agent_executor()
 rmq_client = get_rabbitmq()
+message_router = get_message_router()
 
 CONTROLLER_TASK: Optional[asyncio.Task] = None
 
@@ -36,10 +38,10 @@ async def startup_event():
     # Notifier setup is synchronous, manages asyncio Task internally
     # TODO: unnecessary complexity for questionable performance reasons, probably no need
     notifier.setup()
-    # Informer and Executor are dependencies for Controller, so set them up first
-    await asyncio.gather(informer.setup(), executor.setup())
-    # Set up Controller and RabbitMQ client
-    await asyncio.gather(controller.setup(), rmq_client.setup())
+    # Set up lower-level components
+    await asyncio.gather(informer.setup(), executor.setup(), rmq_client.setup())
+    # Set up higher-level components
+    await asyncio.gather(controller.setup(), message_router.setup())
     # Start core Controller loop
     global CONTROLLER_TASK
     CONTROLLER_TASK = asyncio.create_task(controller.run())
@@ -52,8 +54,10 @@ async def shutdown_event():
         await CONTROLLER_TASK
     try:
         # teardown in reverse of setup
-        await asyncio.gather(controller.teardown(), rmq_client.teardown())
-        await asyncio.gather(informer.teardown(), executor.teardown())
+        await asyncio.gather(controller.teardown(), message_router.teardown())
+        await asyncio.gather(
+            informer.teardown(), executor.teardown(), rmq_client.teardown()
+        )
         notifier.teardown()
     except errors.TeardownError as e:
         logger.error(f"(shutdown_event): {e}")

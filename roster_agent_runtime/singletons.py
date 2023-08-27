@@ -5,6 +5,7 @@ if TYPE_CHECKING:
     from roster_agent_runtime.executors import AgentExecutor
     from roster_agent_runtime.informers.roster import RosterInformer
     from roster_agent_runtime.messaging.rabbitmq import RabbitMQClient
+    from roster_agent_runtime.messaging.router import MessageRouter
     from roster_agent_runtime.notifier import RosterNotifier
     from roster_agent_runtime.services.agent import AgentService
 
@@ -14,6 +15,7 @@ AGENT_EXECUTOR: Optional["AgentExecutor"] = None
 AGENT_CONTROLLER: Optional["AgentController"] = None
 AGENT_SERVICE: Optional["AgentService"] = None
 RABBITMQ_CLIENT: Optional["RabbitMQClient"] = None
+MESSAGE_ROUTER: Optional["MessageRouter"] = None
 
 
 def get_roster_informer() -> "RosterInformer":
@@ -84,3 +86,14 @@ def get_rabbitmq() -> "RabbitMQClient":
 
     RABBITMQ_CLIENT = RabbitMQClient()
     return RABBITMQ_CLIENT
+
+
+def get_message_router() -> "MessageRouter":
+    global MESSAGE_ROUTER
+    if MESSAGE_ROUTER is not None:
+        return MESSAGE_ROUTER
+
+    from roster_agent_runtime.messaging.router import MessageRouter
+
+    MESSAGE_ROUTER = MessageRouter()
+    return MESSAGE_ROUTER

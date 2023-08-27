@@ -24,10 +24,14 @@ class AgentHandle(ABC):
     ) -> None:
         """Trigger an Action implemented by the Agent"""
 
+    # NOTE: 'def' in interface only to workaround type hint deficiency
+    #   AsyncIterator needs 'yield' keyword in implementation (absent in interface)
     @abstractmethod
-    async def outgoing_message_stream(self) -> AsyncIterator[OutgoingMessage]:
+    def outgoing_message_stream(self) -> AsyncIterator[OutgoingMessage]:
         """Stream outgoing messages sent by the Agent to another inbox"""
 
+    # NOTE: 'def' in interface only to workaround type hint deficiency
+    #   AsyncIterator needs 'yield' keyword in implementation (absent in interface)
     @abstractmethod
     def activity_stream(self) -> AsyncIterator[dict]:
         """Stream activities from the agent"""

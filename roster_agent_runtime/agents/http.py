@@ -30,13 +30,18 @@ class HttpAgentHandle(AgentHandle):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.request(method, url, **kwargs) as response:
+                    response_data = await response.json()
                     if raise_for_status:
-                        assert response.status == 200
-                    return await response.json()
+                        assert response.status == 200, response_data
+                    return response_data
         except AssertionError as e:
-            raise errors.AgentError("Agent returned an error.") from e
+            raise errors.AgentError(f"Agent returned an error: {e}.") from e
         except aiohttp.ClientError as e:
             raise errors.AgentError(f"Could not connect to agent {self.name}.") from e
+        except Exception as e:
+            raise errors.AgentError(
+                f"Failed to parse Agent's JSON response: {e}."
+            ) from e
 
     async def chat(
         self,
@@ -66,7 +71,7 @@ class HttpAgentHandle(AgentHandle):
                 headers=headers,
             )
             return response_data["message"]
-        except (KeyError, pydantic.ValidationError) as e:
+        except KeyError as e:
             raise errors.AgentError(
                 f"Could not parse chat response from agent {self.name}."
             ) from e
@@ -75,11 +80,6 @@ class HttpAgentHandle(AgentHandle):
         self, action: str, inputs: dict[str, str], record_id: str, workflow: str
     ) -> None:
         try:
-            headers = {}
-            if execution_id:
-                headers[EXECUTION_ID_HEADER] = execution_id
-            if execution_type:
-                headers[EXECUTION_TYPE_HEADER] = execution_type
             response_data = await self._request(
                 "POST",
                 f"{self.url}/trigger-action",
@@ -89,12 +89,11 @@ class HttpAgentHandle(AgentHandle):
                     "record_id": record_id,
                     "workflow": workflow,
                 },
-                headers=headers,
             )
             return response_data["message"]
-        except (KeyError, pydantic.ValidationError) as e:
+        except KeyError as e:
             raise errors.AgentError(
-                f"Failed to trigger action ({action}) on Agent {self.name}."
+                f"Failed to parse response from action ({action}) on Agent {self.name}."
             ) from e
 
     async def _byte_stream(self, path: str) -> AsyncIterator[bytes]:

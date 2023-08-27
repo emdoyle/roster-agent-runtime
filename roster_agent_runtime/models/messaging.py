@@ -3,6 +3,46 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class WorkflowActionTriggerPayload(BaseModel):
+    action: str = Field(
+        description="The name of the Action reporting outputs in this payload."
+    )
+    inputs: dict[str, str] = Field(
+        description="The inputs for the Action being triggered."
+    )
+
+    class Config:
+        validate_assignment = True
+        schema_extra = {
+            "example": {
+                "action": "ActionName",
+                "inputs": {"input1": "value1", "input2": "value2"},
+            }
+        }
+
+
+class WorkflowMessage(BaseModel):
+    id: str = Field(
+        description="An identifier for the workflow record this message refers to."
+    )
+    workflow: str = Field(description="The workflow this message refers to.")
+    kind: str = Field(description="The kind of the message data.")
+    data: dict = Field(default_factory=dict, description="The data of the message.")
+
+    class Config:
+        validate_assignment = True
+        schema_extra = {
+            "example": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "workflow": "WorkflowName",
+                "kind": "initiate_workflow",
+                "data": {
+                    "inputs": {"input1": "value1", "input2": "value2"},
+                },
+            }
+        }
+
+
 class Recipient(BaseModel):
     kind: str = Field(
         description="The kind of recipient (agent, roster-admin, tool etc.)"

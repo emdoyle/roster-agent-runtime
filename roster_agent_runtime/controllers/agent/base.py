@@ -117,7 +117,7 @@ class AgentController:
         if event.resource_type == "AGENT":
             self.desired.agents[event.name] = event.resource.spec
         else:
-            logger.warn(
+            logger.debug(
                 "(agent-control) Unknown spec event resource type from Roster API: %s",
                 event.resource_type,
             )
@@ -126,24 +126,21 @@ class AgentController:
         if event.resource_type == "AGENT":
             self.desired.agents.pop(event.name, None)
         else:
-            logger.warn(
+            logger.debug(
                 "(agent-control) Unknown spec event resource type from Roster API: %s",
                 event.resource_type,
             )
 
-    async def _serial_handle_spec_event(self, event: RosterResourceEvent):
-        async with self.lock:
-            logger.info("Received spec event: %s", event)
-            if event.event_type == "PUT":
-                self._handle_put_spec_event(event)
-            elif event.event_type == "DELETE":
-                self._handle_delete_spec_event(event)
-            else:
-                logger.warn("(agent-control) Unknown event: %s", event)
-        self.reconciliation_queue.put_nowait(True)
-
     def _handle_spec_event(self, event: RosterResourceEvent):
-        asyncio.create_task(self._serial_handle_spec_event(event))
+        logger.info("Controller received spec event: %s", event)
+        if event.event_type == "PUT":
+            self._handle_put_spec_event(event)
+        elif event.event_type == "DELETE":
+            self._handle_delete_spec_event(event)
+        else:
+            logger.debug("(agent-control) Unknown event: %s", event)
+
+        self.reconciliation_queue.put_nowait(True)
 
     def setup_spec_listeners(self):
         self.roster_informer.add_event_listener(self._handle_spec_event)

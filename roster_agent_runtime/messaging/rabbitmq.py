@@ -113,7 +113,8 @@ class RabbitMQClient:
             async with message.process():
                 callbacks = self.callbacks.get(queue_name, [])
                 await asyncio.gather(
-                    *[callback(message.body.decode()) for callback in callbacks]
+                    *[callback(message.body.decode()) for callback in callbacks],
+                    return_exceptions=True,
                 )
 
         return handle_message
