@@ -14,6 +14,7 @@ class EventType(Enum):
     DELETE = "DELETE"
 
 
+# TODO: there is no need for a distinct type here, should reconcile w/ ResourceStatusEvent
 class ControllerStatusEvent(BaseModel):
     resource_type: Resource
     event_type: EventType

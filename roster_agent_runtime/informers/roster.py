@@ -1,6 +1,7 @@
 from typing import Callable, Optional
 
 import aiohttp
+import pydantic
 from pydantic import BaseModel, Field
 from roster_agent_runtime import settings
 from roster_agent_runtime.informers.base import Informer
@@ -28,8 +29,8 @@ class RosterAPIURLConfig(BaseModel):
         validate_assignment = True
 
 
-# This is only watching Agent resource changes for now,
-# and is only used by the AgentController
+# This is only watching Agent resource changes for now
+# TODO: enable status changes here as well, ensure no issues with AgentExecutor
 class RosterInformer(Informer[RosterSpec, RosterResourceEvent]):
     DEFAULT_EVENT_PARAMS = {
         # We are only interested in Spec events, not Status events
@@ -60,8 +61,8 @@ class RosterInformer(Informer[RosterSpec, RosterResourceEvent]):
                     for agent in await resp.json():
                         spec = AgentResource(**agent).spec
                         self.agents[spec.name] = spec
-            except (aiohttp.ClientError, TypeError):
-                logger.error("(roster-spec) Failed to load initial agents")
+            except (aiohttp.ClientError, TypeError, pydantic.ValidationError) as e:
+                logger.error("(roster-spec) Failed to load initial agents: %s", e)
 
     async def setup(self):
         logger.debug("Setting up Roster Informer")
@@ -94,7 +95,14 @@ class RosterInformer(Informer[RosterSpec, RosterResourceEvent]):
             logger.warn("(roster-spec) Unknown event: %s", event)
         logger.debug("(roster-spec) Pushing Spec event to listeners: %s", event)
         for listener in self.event_listeners:
-            listener(event)
+            try:
+                listener(event)
+            except Exception as e:
+                logger.debug(
+                    "(roster-spec) Failed to push Spec event to listener: %s; %s",
+                    listener,
+                    e,
+                )
 
     def add_event_listener(self, callback: Callable[[RosterResourceEvent], None]):
         self.event_listeners.append(callback)

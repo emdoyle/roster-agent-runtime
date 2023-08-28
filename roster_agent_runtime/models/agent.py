@@ -34,6 +34,7 @@ class Action(BaseModel):
 
 class AgentSpec(BaseModel):
     name: str = Field(description="A name to identify the agent.")
+    executor: str = Field(description="The executor which should run the agent.")
     image: str = Field(description="A path to the image to be used for this agent.")
     tag: str = Field(
         description="A tag to identify the version of the image to be used for this agent.",
@@ -48,6 +49,7 @@ class AgentSpec(BaseModel):
         schema_extra = {
             "example": {
                 "name": "Alice",
+                "executor": "local",
                 "image": ".local/agent",
                 "tag": "latest",
                 "actions": [
@@ -86,6 +88,7 @@ class AgentContainer(BaseModel):
 
 class AgentStatus(BaseModel):
     name: str = Field(description="The name of the agent.")
+    executor: str = Field(description="The executor which is managing the agent.")
     status: str = Field(description="The status of the agent.")
     container: Optional[AgentContainer] = Field(
         default=None, description="The container running the agent."
@@ -96,6 +99,7 @@ class AgentStatus(BaseModel):
         schema_extra = {
             "example": {
                 "name": "Alice",
+                "executor": "local",
                 "status": "running",
                 "container": AgentContainer.Config.schema_extra["example"],
             }

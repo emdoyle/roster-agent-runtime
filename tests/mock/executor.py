@@ -2,7 +2,7 @@ from typing import Callable
 
 from roster_agent_runtime import errors
 from roster_agent_runtime.executors.base import AgentExecutor
-from roster_agent_runtime.executors.events import ExecutorStatusEvent
+from roster_agent_runtime.executors.events import ResourceStatusEvent
 from roster_agent_runtime.models.agent import AgentContainer, AgentSpec, AgentStatus
 from roster_agent_runtime.models.conversation import ConversationMessage
 
@@ -41,6 +41,7 @@ class MockAgentExecutor(AgentExecutor):
     def add_agent(self, spec: AgentSpec):
         self.agents[spec.name] = AgentStatus(
             name=spec.name,
+            executor=spec.executor,
             status="running",
             container=get_mock_container(image=spec.image),
         )
@@ -80,10 +81,10 @@ class MockAgentExecutor(AgentExecutor):
             sender="mock_agent_executor",
         )
 
-    def add_event_listener(self, listener: Callable[[ExecutorStatusEvent], None]):
+    def add_status_listener(self, listener: Callable[[ResourceStatusEvent], None]):
         self.event_listeners.append(listener)
 
-    def remove_event_listener(self, listener: Callable[[ExecutorStatusEvent], None]):
+    def remove_status_listener(self, listener: Callable[[ResourceStatusEvent], None]):
         self.event_listeners.remove(listener)
 
     # Methods below are meant to be used by the test suite

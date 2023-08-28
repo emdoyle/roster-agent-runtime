@@ -2,12 +2,13 @@ from abc import ABC, abstractmethod
 from typing import Callable
 
 from roster_agent_runtime.agents.base import AgentHandle
-from roster_agent_runtime.executors.events import ExecutorStatusEvent
+from roster_agent_runtime.executors.events import ResourceStatusEvent
 from roster_agent_runtime.models.agent import AgentSpec, AgentStatus
 
 
-# This can be thought of like an AgentPool
 class AgentExecutor(ABC):
+    KEY = NotImplemented
+
     @abstractmethod
     async def setup(self):
         """setup executor -- called once on startup to load status from environment"""
@@ -41,9 +42,9 @@ class AgentExecutor(ABC):
         """get agent handle"""
 
     @abstractmethod
-    def add_event_listener(self, listener: Callable[[ExecutorStatusEvent], None]):
+    def add_status_listener(self, listener: Callable[[ResourceStatusEvent], None]):
         """add listener"""
 
     @abstractmethod
-    def remove_event_listener(self, listener: Callable[[ExecutorStatusEvent], None]):
+    def remove_status_listener(self, listener: Callable[[ResourceStatusEvent], None]):
         """remove listener"""

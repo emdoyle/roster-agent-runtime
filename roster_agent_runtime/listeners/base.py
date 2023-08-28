@@ -38,11 +38,12 @@ class EventListener:
                             for middleware in self.middleware:
                                 line = middleware(line)
                             handler(line)
-                        except Exception:
+                        except Exception as e:
                             logger.error(
-                                "(evt-listen) [%s] Error handling event: %s",
+                                "(evt-listen) [%s] Error handling event: %s; %s",
                                 self.url,
                                 line,
+                                e,
                             )
 
     def run_as_task(self) -> asyncio.Task:

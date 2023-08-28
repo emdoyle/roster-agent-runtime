@@ -9,7 +9,7 @@ from roster_agent_runtime.api.messaging import router as messaging_router
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.singletons import (
     get_agent_controller,
-    get_agent_executor,
+    get_agent_pool,
     get_message_router,
     get_rabbitmq,
     get_roster_informer,
@@ -22,7 +22,7 @@ app = FastAPI(title="Roster Runtime API", version="0.1.0")
 controller = get_agent_controller()
 informer = get_roster_informer()
 notifier = get_roster_notifier()
-executor = get_agent_executor()
+agent_pool = get_agent_pool()
 rmq_client = get_rabbitmq()
 message_router = get_message_router()
 
@@ -39,7 +39,7 @@ async def startup_event():
     # TODO: unnecessary complexity for questionable performance reasons, probably no need
     notifier.setup()
     # Set up lower-level components
-    await asyncio.gather(informer.setup(), executor.setup(), rmq_client.setup())
+    await asyncio.gather(informer.setup(), agent_pool.setup(), rmq_client.setup())
     # Set up higher-level components
     await asyncio.gather(controller.setup(), message_router.setup())
     # Start core Controller loop
@@ -56,7 +56,7 @@ async def shutdown_event():
         # teardown in reverse of setup
         await asyncio.gather(controller.teardown(), message_router.teardown())
         await asyncio.gather(
-            informer.teardown(), executor.teardown(), rmq_client.teardown()
+            informer.teardown(), agent_pool.teardown(), rmq_client.teardown()
         )
         notifier.teardown()
     except errors.TeardownError as e:

@@ -10,12 +10,12 @@ from roster_agent_runtime.models.messaging import (
     WorkflowMessage,
 )
 from roster_agent_runtime.singletons import (
-    get_agent_executor,
+    get_agent_pool,
     get_rabbitmq,
     get_roster_informer,
 )
 
-from ..executors import AgentExecutor
+from ..agents.pool import AgentPool
 from ..informers.events.spec import RosterResourceEvent
 from ..informers.roster import RosterInformer
 from ..logs import app_logger
@@ -94,11 +94,11 @@ class AgentMessageRouter:
 class MessageRouter:
     def __init__(
         self,
-        agent_executor: Optional[AgentExecutor] = None,
+        agent_pool: Optional[AgentPool] = None,
         roster_informer: Optional[RosterInformer] = None,
         rmq_client: Optional[RabbitMQClient] = None,
     ):
-        self.agent_executor = agent_executor or get_agent_executor()
+        self.agent_pool = agent_pool or get_agent_pool()
         self.roster_informer = roster_informer or get_roster_informer()
         self.rmq_client = rmq_client or get_rabbitmq()
         self.agent_routers: dict[str, AgentMessageRouter] = {}
@@ -111,7 +111,7 @@ class MessageRouter:
         agents = self.roster_informer.list()
         setup_coros = []
         for agent in agents:
-            handle = self.agent_executor.get_agent_handle(agent.name)
+            handle = self.agent_pool.get_agent_handle(agent.name)
             agent_router = AgentMessageRouter(
                 agent_handle=handle,
                 queue_name=queue_name_for_agent(agent.name),
@@ -134,10 +134,11 @@ class MessageRouter:
             logger.debug("(agent-router) Unknown event: %s", event)
             return
 
+        # TODO: handle race conditions due to Task creation here
         if event.event_type == "PUT":
-            asyncio.run(self._handle_agent_added(event))
+            asyncio.create_task(self._handle_agent_added(event))
         elif event.event_type == "DELETE":
-            asyncio.run(self._handle_agent_removed(event))
+            asyncio.create_task(self._handle_agent_removed(event))
         else:
             logger.debug("(agent-router) Unknown event: %s", event)
 
@@ -148,7 +149,7 @@ class MessageRouter:
             )
             return
 
-        handle = self.agent_executor.get_agent_handle(event.name)
+        handle = self.agent_pool.get_agent_handle(event.name)
         agent_router = AgentMessageRouter(
             agent_handle=handle,
             queue_name=queue_name_for_agent(event.name),

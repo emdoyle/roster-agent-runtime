@@ -14,7 +14,7 @@ class EventType(Enum):
     DELETE = "Delete"
 
 
-class ExecutorStatusEvent(BaseModel):
+class ResourceStatusEvent(BaseModel):
     resource_type: Resource
     event_type: EventType
     name: str

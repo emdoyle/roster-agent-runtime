@@ -1,14 +1,14 @@
 from roster_agent_runtime.agents import AgentHandle
-from roster_agent_runtime.executors import AgentExecutor
+from roster_agent_runtime.agents.pool import AgentPool
 from roster_agent_runtime.models.conversation import ConversationMessage
 
 
 class AgentService:
-    def __init__(self, executor: AgentExecutor):
-        self.executor = executor
+    def __init__(self, pool: AgentPool):
+        self.pool = pool
 
     def _get_agent_handle(self, name: str) -> AgentHandle:
-        return self.executor.get_agent_handle(name)
+        return self.pool.get_agent_handle(name)
 
     async def chat_prompt_agent(
         self,

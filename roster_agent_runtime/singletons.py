@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
+    from roster_agent_runtime.agents.pool import AgentPool
     from roster_agent_runtime.controllers.agent import AgentController
-    from roster_agent_runtime.executors import AgentExecutor
     from roster_agent_runtime.informers.roster import RosterInformer
     from roster_agent_runtime.messaging.rabbitmq import RabbitMQClient
     from roster_agent_runtime.messaging.router import MessageRouter
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 ROSTER_INFORMER: Optional["RosterInformer"] = None
 ROSTER_NOTIFIER: Optional["RosterNotifier"] = None
-AGENT_EXECUTOR: Optional["AgentExecutor"] = None
+AGENT_POOL: Optional["AgentPool"] = None
 AGENT_CONTROLLER: Optional["AgentController"] = None
 AGENT_SERVICE: Optional["AgentService"] = None
 RABBITMQ_CLIENT: Optional["RabbitMQClient"] = None
@@ -40,17 +40,19 @@ def get_roster_notifier() -> "RosterNotifier":
     return ROSTER_NOTIFIER
 
 
-def get_agent_executor() -> "AgentExecutor":
-    global AGENT_EXECUTOR
-    if AGENT_EXECUTOR is not None:
-        return AGENT_EXECUTOR
+def get_agent_pool() -> "AgentPool":
+    global AGENT_POOL
+    if AGENT_POOL is not None:
+        return AGENT_POOL
 
-    # TODO: Make this configurable -- probably shouldn't be a singleton
+    from roster_agent_runtime.agents.pool import AgentPool
+
+    # TODO: Make this configurable
     from roster_agent_runtime.executors.docker import DockerAgentExecutor
 
-    AGENT_EXECUTOR = DockerAgentExecutor()
+    AGENT_POOL = AgentPool(executors=[DockerAgentExecutor()])
 
-    return AGENT_EXECUTOR
+    return AGENT_POOL
 
 
 def get_agent_controller() -> "AgentController":
@@ -61,7 +63,7 @@ def get_agent_controller() -> "AgentController":
     from roster_agent_runtime.controllers.agent import AgentController
 
     AGENT_CONTROLLER = AgentController(
-        executor=get_agent_executor(),
+        pool=get_agent_pool(),
     )
     return AGENT_CONTROLLER
 
@@ -73,7 +75,7 @@ def get_agent_service() -> "AgentService":
 
     from roster_agent_runtime.services.agent import AgentService
 
-    AGENT_SERVICE = AgentService(executor=get_agent_executor())
+    AGENT_SERVICE = AgentService(pool=get_agent_pool())
     return AGENT_SERVICE
 
 

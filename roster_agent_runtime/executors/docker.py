@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from roster_agent_runtime import errors, settings
 from roster_agent_runtime.agents import AgentHandle, HttpAgentHandle
 from roster_agent_runtime.executors.base import AgentExecutor
-from roster_agent_runtime.executors.events import ExecutorStatusEvent
+from roster_agent_runtime.executors.events import ResourceStatusEvent
 from roster_agent_runtime.executors.store import AgentExecutorStore
 from roster_agent_runtime.listeners.docker import (
     DEFAULT_EVENT_FILTERS,
@@ -83,6 +83,7 @@ class ExpectedStatusEvent(BaseModel):
 
 # TODO: make docker client operations async
 class DockerAgentExecutor(AgentExecutor):
+    KEY = "docker"
     ROSTER_CONTAINER_LABEL = "roster-agent"
 
     def __init__(self):
@@ -187,6 +188,7 @@ class DockerAgentExecutor(AgentExecutor):
             )
         agent_status = AgentStatus(
             name=agent_name,
+            executor=self.KEY,
             container=agent_container,
             status=agent_container.status,
         )
@@ -413,7 +415,7 @@ class DockerAgentExecutor(AgentExecutor):
             if agent.container is not None and agent.container.name == container_name:
                 return agent
 
-    def _handle_docker_start_event(self, event: dict) -> Optional[ExecutorStatusEvent]:
+    def _handle_docker_start_event(self, event: dict) -> Optional[ResourceStatusEvent]:
         try:
             agent_name = event["Actor"]["Attributes"][self.ROSTER_CONTAINER_LABEL]
             container_name = event["Actor"]["Attributes"]["name"]
@@ -444,6 +446,7 @@ class DockerAgentExecutor(AgentExecutor):
             # This is a new container, so we should update the agent status and notify listeners.
             updated_agent = AgentStatus(
                 name=agent_name,
+                executor=self.KEY,
                 status=container.status,
                 container=serialize_agent_container(container),
             )
@@ -465,6 +468,7 @@ class DockerAgentExecutor(AgentExecutor):
         # Otherwise, we should update the agent status and notify listeners.
         updated_agent = AgentStatus(
             name=agent_name,
+            executor=self.KEY,
             status=container.status,
             container=serialize_agent_container(container),
         )
@@ -509,8 +513,8 @@ class DockerAgentExecutor(AgentExecutor):
         elif event["Action"] in ["die", "destroy"]:
             self._handle_docker_kill_event(event)
 
-    def add_event_listener(self, listener: Callable[[ExecutorStatusEvent], None]):
+    def add_status_listener(self, listener: Callable[[ResourceStatusEvent], None]):
         self.store.add_status_listener(listener)
 
-    def remove_event_listener(self, listener: Callable[[ExecutorStatusEvent], None]):
+    def remove_status_listener(self, listener: Callable[[ResourceStatusEvent], None]):
         self.store.remove_status_listener(listener)

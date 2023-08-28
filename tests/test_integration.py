@@ -21,7 +21,7 @@ def roster_informer():
 @pytest.fixture
 def controller(executor, roster_informer):
     yield AgentController(
-        executor=executor,
+        pool=executor,
         roster_informer=roster_informer,
     )
 

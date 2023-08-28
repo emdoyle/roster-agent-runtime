@@ -1,14 +1,15 @@
 import asyncio
+from copy import copy
 from typing import Optional
 
 from roster_agent_runtime import errors
+from roster_agent_runtime.agents.pool import AgentPool
 from roster_agent_runtime.controllers.agent.store import AgentControllerStore
 from roster_agent_runtime.controllers.events.status import ControllerStatusEvent
-from roster_agent_runtime.executors import AgentExecutor
 from roster_agent_runtime.executors.events import (
     EventType,
-    ExecutorStatusEvent,
     Resource,
+    ResourceStatusEvent,
 )
 from roster_agent_runtime.informers.events.spec import RosterResourceEvent
 from roster_agent_runtime.informers.roster import RosterInformer
@@ -23,12 +24,11 @@ logger = app_logger()
 class AgentController:
     def __init__(
         self,
-        executor: AgentExecutor,
+        pool: AgentPool,
         roster_informer: Optional[RosterInformer] = None,
         roster_notifier: Optional[RosterNotifier] = None,
     ):
-        # TODO: support multiple AgentExecutors/Pools
-        self.executor = executor
+        self.pool = pool
         self.roster_informer = roster_informer or get_roster_informer()
         self.roster_notifier = roster_notifier or get_roster_notifier()
         self.store = AgentControllerStore(
@@ -39,14 +39,6 @@ class AgentController:
         self.reconciliation_queue = asyncio.Queue()
         self.reconciliation_task = None
         self.lock = asyncio.Lock()
-
-    @property
-    def desired(self):
-        return self.store.desired
-
-    @property
-    def current(self):
-        return self.store.current
 
     async def setup(self):
         logger.debug("(agent-control) Setup started.")
@@ -106,16 +98,16 @@ class AgentController:
         # Load full desired state from Roster API
         for spec in self.roster_informer.list():
             if isinstance(spec, AgentSpec):
-                self.desired.agents[spec.name] = spec
+                self.store.put_agent_spec(spec)
 
     def load_initial_status(self):
-        # Load full current state from Executor
-        for status in self.executor.list_agents():
-            self.store.put_agent(status.name, status)
+        # Load full current state from AgentPool
+        for status in self.pool.list_agents():
+            self.store.put_agent_status(status)
 
     def _handle_put_spec_event(self, event: RosterResourceEvent):
         if event.resource_type == "AGENT":
-            self.desired.agents[event.name] = event.resource.spec
+            self.store.put_agent_spec(event.resource.spec)
         else:
             logger.debug(
                 "(agent-control) Unknown spec event resource type from Roster API: %s",
@@ -124,7 +116,10 @@ class AgentController:
 
     def _handle_delete_spec_event(self, event: RosterResourceEvent):
         if event.resource_type == "AGENT":
-            self.desired.agents.pop(event.name, None)
+            try:
+                self.store.delete_agent_spec(event.name)
+            except errors.AgentNotFoundError:
+                return
         else:
             logger.debug(
                 "(agent-control) Unknown spec event resource type from Roster API: %s",
@@ -146,23 +141,23 @@ class AgentController:
         self.roster_informer.add_event_listener(self._handle_spec_event)
 
     def setup_status_listeners(self):
-        self.executor.add_event_listener(self._handle_status_event)
+        self.pool.add_status_listener(self._handle_status_event)
 
-    def _handle_agent_status_event(self, event: ExecutorStatusEvent):
+    def _handle_agent_status_event(self, event: ResourceStatusEvent):
         if event.event_type == EventType.PUT:
             try:
                 agent = event.get_agent_status()
-                self.store.put_agent(event.name, agent)
+                self.store.put_agent_status(agent)
             except ValueError:
                 return
         elif event.event_type == EventType.DELETE:
             try:
-                self.store.delete_agent(event.name)
+                self.store.delete_agent_status(event.name)
             except errors.AgentNotFoundError:
                 return
         self.reconciliation_queue.put_nowait(True)
 
-    def _handle_status_event(self, event: ExecutorStatusEvent):
+    def _handle_status_event(self, event: ResourceStatusEvent):
         if event.resource_type == Resource.AGENT:
             self._handle_agent_status_event(event)
         else:
@@ -197,48 +192,43 @@ class AgentController:
 
     async def reconcile_agents(self):
         logger.debug("(rec-agents) Reconciling agents...")
-        logger.debug("(rec-agents) Current agents: %s", self.current.agents)
-        logger.debug("(rec-agents) Desired agents: %s", self.desired.agents)
-        for name, spec in self.desired.agents.items():
-            if name not in self.current.agents:
+        current_agents = copy(self.store.current)
+        desired_agents = copy(self.store.desired)
+        logger.debug("(rec-agents) Current agents: %s", current_agents)
+        logger.debug("(rec-agents) Desired agents: %s", desired_agents)
+        for name, spec in desired_agents.items():
+            if name not in current_agents:
                 await self.create_agent(spec)
-            elif not self.agent_matches_spec(self.current.agents[name], spec):
+            elif not self.agent_matches_spec(current_agents[name], spec):
                 await self.update_agent(spec)
-        current_agents = list(self.current.agents.items())
-        for name, agent in current_agents:
-            if name not in self.desired.agents:
+        for name, agent in current_agents.items():
+            if name not in desired_agents:
                 await self.delete_agent(agent.name)
-        logger.debug("(rec-agents) Final agents: %s", self.current.agents)
+        logger.debug("(rec-agents) Final agents: %s", self.store.current)
 
     async def create_agent(self, agent: AgentSpec) -> AgentStatus:
-        if agent.name in self.current.agents:
+        if agent.name in self.store.current:
             raise errors.AgentAlreadyExistsError(agent=agent.name)
-        self.store.put_agent(agent.name, await self.executor.create_agent(agent))
-        status = self.current.agents[agent.name]
+        agent_status = await self.pool.create_agent(agent)
+        self.store.put_agent_status(agent_status)
         logger.info("Created agent %s", agent.name)
-        return status
+        return agent_status
 
     async def update_agent(self, agent: AgentSpec) -> AgentStatus:
-        if agent.name not in self.current.agents:
+        if agent.name not in self.store.current:
             raise errors.AgentNotFoundError(agent=agent.name)
-        self.store.put_agent(agent.name, await self.executor.update_agent(agent))
-        status = self.current.agents[agent.name]
+        agent_status = await self.pool.update_agent(agent)
+        self.store.put_agent_status(agent_status)
         logger.info("Updated agent %s", agent.name)
-        return status
+        return agent_status
 
     def list_agents(self) -> list[AgentStatus]:
-        return list(self.current.agents.values())
-
-    def get_agent(self, name: str) -> AgentStatus:
-        try:
-            return self.current.agents[name]
-        except KeyError as e:
-            raise errors.AgentNotFoundError(agent=name) from e
+        return list(self.store.current.values())
 
     async def delete_agent(self, name: str) -> None:
         try:
-            await self.executor.delete_agent(name)
-            self.store.delete_agent(name)
+            await self.pool.delete_agent(name)
+            self.store.delete_agent_status(name)
             logger.info("Deleted agent %s", name)
         except errors.AgentNotFoundError:
             pass
