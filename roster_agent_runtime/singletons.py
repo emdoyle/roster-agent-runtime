@@ -49,8 +49,9 @@ def get_agent_pool() -> "AgentPool":
 
     # TODO: Make this configurable
     from roster_agent_runtime.executors.docker import DockerAgentExecutor
+    from roster_agent_runtime.executors.local import LocalAgentExecutor
 
-    AGENT_POOL = AgentPool(executors=[DockerAgentExecutor()])
+    AGENT_POOL = AgentPool(executors=[DockerAgentExecutor(), LocalAgentExecutor()])
 
     return AGENT_POOL
 

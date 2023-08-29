@@ -41,7 +41,14 @@ async def startup_event():
     # Set up lower-level components
     await asyncio.gather(informer.setup(), agent_pool.setup(), rmq_client.setup())
     # Set up higher-level components
-    await asyncio.gather(controller.setup(), message_router.setup())
+    # NOTE: order matters here, and is a quick-fix for lack of Status awareness in message router
+    #   The message router views specs only, and tries to acquire handles to all specified Agents
+    #   immediately.
+    #   Controller reconciles during setup, so assuming reconciliation works, router will be
+    #   able to acquire handles.
+    #   TODO: make message router Status-aware
+    await controller.setup()
+    await message_router.setup()
     # Start core Controller loop
     global CONTROLLER_TASK
     CONTROLLER_TASK = asyncio.create_task(controller.run())

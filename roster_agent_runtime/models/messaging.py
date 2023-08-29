@@ -97,6 +97,6 @@ class OutgoingMessage(BaseModel):
                 "id": record_id,
                 "workflow": workflow,
                 "kind": "report_action",
-                "payload": {"action": action, "outputs": outputs, "error": error},
+                "data": {"action": action, "outputs": outputs, "error": error},
             },
         )
