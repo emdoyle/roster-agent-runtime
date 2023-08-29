@@ -88,7 +88,7 @@ class OutgoingMessage(BaseModel):
         record_id: str,
         workflow: str,
         action: str,
-        outputs: Optional[dict] = None,
+        outputs: Optional[dict[str, str]] = None,
         error: str = "",
     ):
         return cls(

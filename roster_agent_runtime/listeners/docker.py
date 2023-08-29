@@ -3,8 +3,8 @@ import json
 from typing import Callable, Optional
 
 import aiohttp
+from roster_agent_runtime.logs import app_logger
 
-from ..logs import app_logger
 from .stream import JSONStream
 
 DEFAULT_EVENT_FILTERS = {

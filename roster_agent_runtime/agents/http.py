@@ -2,13 +2,12 @@ import json
 from typing import AsyncIterator
 
 import aiohttp
-import pydantic
 from roster_agent_runtime import errors
+from roster_agent_runtime.constants import EXECUTION_ID_HEADER, EXECUTION_TYPE_HEADER
+from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.conversation import ConversationMessage
 from roster_agent_runtime.models.messaging import OutgoingMessage
 
-from ..constants import EXECUTION_ID_HEADER, EXECUTION_TYPE_HEADER
-from ..logs import app_logger
 from .base import AgentHandle
 
 logger = app_logger()

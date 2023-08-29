@@ -3,6 +3,10 @@ import json
 from typing import Optional
 
 from roster_agent_runtime.agents import AgentHandle
+from roster_agent_runtime.agents.pool import AgentPool
+from roster_agent_runtime.informers.events.spec import RosterResourceEvent
+from roster_agent_runtime.informers.roster import RosterInformer
+from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.messaging import (
     OutgoingMessage,
     Recipient,
@@ -15,10 +19,6 @@ from roster_agent_runtime.singletons import (
     get_roster_informer,
 )
 
-from ..agents.pool import AgentPool
-from ..informers.events.spec import RosterResourceEvent
-from ..informers.roster import RosterInformer
-from ..logs import app_logger
 from .rabbitmq import RabbitMQClient
 
 logger = app_logger()
@@ -72,12 +72,15 @@ class AgentMessageRouter:
             return
 
         logger.debug("(agent-router) Received action trigger: %s", action_trigger)
-        await self.agent_handle.trigger_action(
-            action=action_trigger.action,
-            inputs=action_trigger.inputs,
-            record_id=workflow_message.id,
-            workflow=workflow_message.workflow,
-        )
+        try:
+            await self.agent_handle.trigger_action(
+                action=action_trigger.action,
+                inputs=action_trigger.inputs,
+                record_id=workflow_message.id,
+                workflow=workflow_message.workflow,
+            )
+        except Exception as e:
+            logger.debug("(agent-router) Failed to trigger action: %s", e)
 
     async def consume_outgoing_messages(self):
         # TODO: resiliency if the stream is broken
