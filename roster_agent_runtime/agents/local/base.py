@@ -24,7 +24,12 @@ class LocalAgent(ABC):
 
     @abstractmethod
     async def trigger_action(
-        self, action: str, inputs: dict[str, str], record_id: str, workflow: str
+        self,
+        action: str,
+        inputs: dict[str, str],
+        role_context: str,
+        record_id: str,
+        workflow: str,
     ) -> None:
         ...
 
@@ -62,7 +67,12 @@ class BaseLocalAgent(LocalAgent):
         raise NotImplementedError(f"chat not implemented for agent: {self.NAME}")
 
     async def trigger_action(
-        self, action: str, inputs: dict[str, str], record_id: str, workflow: str
+        self,
+        action: str,
+        inputs: dict[str, str],
+        role_context: str,
+        record_id: str,
+        workflow: str,
     ) -> None:
         action_class = next(
             (
@@ -78,9 +88,7 @@ class BaseLocalAgent(LocalAgent):
         action_output: Optional[dict] = None
         action_error: str = ""
         try:
-            action_output = await action_class().execute(
-                inputs, context=self.AGENT_CONTEXT
-            )
+            action_output = await action_class().execute(inputs, context=role_context)
         except Exception as e:
             action_error = str(e)
 

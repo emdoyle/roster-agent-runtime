@@ -76,6 +76,7 @@ class AgentMessageRouter:
             await self.agent_handle.trigger_action(
                 action=action_trigger.action,
                 inputs=action_trigger.inputs,
+                role_context=action_trigger.role_context,
                 record_id=workflow_message.id,
                 workflow=workflow_message.workflow,
             )

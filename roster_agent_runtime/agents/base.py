@@ -20,7 +20,12 @@ class AgentHandle(ABC):
 
     @abstractmethod
     async def trigger_action(
-        self, action: str, inputs: dict[str, str], record_id: str, workflow: str
+        self,
+        action: str,
+        inputs: dict[str, str],
+        role_context: str,
+        record_id: str,
+        workflow: str,
     ) -> None:
         """Trigger an Action implemented by the Agent"""
 

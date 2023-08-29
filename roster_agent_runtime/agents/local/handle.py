@@ -61,10 +61,19 @@ class LocalAgentHandle(AgentHandle):
         )
 
     async def trigger_action(
-        self, action: str, inputs: dict[str, str], record_id: str, workflow: str
+        self,
+        action: str,
+        inputs: dict[str, str],
+        role_context: str,
+        record_id: str,
+        workflow: str,
     ) -> None:
         await self.agent.trigger_action(
-            action=action, inputs=inputs, record_id=record_id, workflow=workflow
+            action=action,
+            inputs=inputs,
+            role_context=role_context,
+            record_id=record_id,
+            workflow=workflow,
         )
 
     async def outgoing_message_stream(self) -> AsyncIterator[OutgoingMessage]:

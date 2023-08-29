@@ -10,6 +10,9 @@ class WorkflowActionTriggerPayload(BaseModel):
     inputs: dict[str, str] = Field(
         description="The inputs for the Action being triggered."
     )
+    role_context: str = Field(
+        description="A description of the Role which is performing the Action."
+    )
 
     class Config:
         validate_assignment = True
@@ -17,6 +20,7 @@ class WorkflowActionTriggerPayload(BaseModel):
             "example": {
                 "action": "ActionName",
                 "inputs": {"input1": "value1", "input2": "value2"},
+                "role_context": "A description of the role",
             }
         }
 

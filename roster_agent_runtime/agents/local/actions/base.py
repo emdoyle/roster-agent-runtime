@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 
 class LocalAgentAction(ABC):
@@ -7,6 +6,6 @@ class LocalAgentAction(ABC):
 
     @abstractmethod
     async def execute(
-        self, inputs: dict[str, str], context: Optional[dict] = None
+        self, inputs: dict[str, str], context: str = ""
     ) -> dict[str, str]:
         ...
