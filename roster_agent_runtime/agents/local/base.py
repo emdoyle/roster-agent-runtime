@@ -85,7 +85,7 @@ class BaseLocalAgent(LocalAgent):
         if action_class is None:
             raise errors.AgentError(f"Unknown action: {action} for agent: {self.NAME}")
 
-        action_output: Optional[dict] = None
+        action_output: dict[str, str] = {}
         action_error: str = ""
         try:
             action_output = await action_class().execute(inputs, context=role_context)
