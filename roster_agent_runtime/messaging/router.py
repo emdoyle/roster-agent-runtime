@@ -74,6 +74,7 @@ class AgentMessageRouter:
         logger.debug("(agent-router) Received action trigger: %s", action_trigger)
         try:
             await self.agent_handle.trigger_action(
+                step=action_trigger.step,
                 action=action_trigger.action,
                 inputs=action_trigger.inputs,
                 role_context=action_trigger.role_context,

@@ -23,7 +23,7 @@ class LocalAgentHandle(AgentHandle):
         # dynamic import of agent module from name
         try:
             module = importlib.import_module(f"{package}.{name}")
-        except ImportError:
+        except (ModuleNotFoundError, ImportError):
             raise errors.AgentNotFoundError(agent=name)
 
         # get the agent class from the module
@@ -62,6 +62,7 @@ class LocalAgentHandle(AgentHandle):
 
     async def trigger_action(
         self,
+        step: str,
         action: str,
         inputs: dict[str, str],
         role_context: str,
@@ -69,6 +70,7 @@ class LocalAgentHandle(AgentHandle):
         workflow: str,
     ) -> None:
         await self.agent.trigger_action(
+            step=step,
             action=action,
             inputs=inputs,
             role_context=role_context,

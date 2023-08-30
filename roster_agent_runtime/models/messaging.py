@@ -4,9 +4,10 @@ from pydantic import BaseModel, Field
 
 
 class WorkflowActionTriggerPayload(BaseModel):
-    action: str = Field(
-        description="The name of the Action reporting outputs in this payload."
+    step: str = Field(
+        description="The name of the Step reporting outputs in this payload."
     )
+    action: str = Field(description="The name of the Action being triggered.")
     inputs: dict[str, str] = Field(
         description="The inputs for the Action being triggered."
     )
@@ -18,6 +19,7 @@ class WorkflowActionTriggerPayload(BaseModel):
         validate_assignment = True
         schema_extra = {
             "example": {
+                "step": "StepName",
                 "action": "ActionName",
                 "inputs": {"input1": "value1", "input2": "value2"},
                 "role_context": "A description of the role",
@@ -91,6 +93,7 @@ class OutgoingMessage(BaseModel):
         cls,
         record_id: str,
         workflow: str,
+        step: str,
         action: str,
         outputs: Optional[dict[str, str]] = None,
         error: str = "",
@@ -101,6 +104,11 @@ class OutgoingMessage(BaseModel):
                 "id": record_id,
                 "workflow": workflow,
                 "kind": "report_action",
-                "data": {"action": action, "outputs": outputs, "error": error},
+                "data": {
+                    "step": step,
+                    "action": action,
+                    "outputs": outputs,
+                    "error": error,
+                },
             },
         )

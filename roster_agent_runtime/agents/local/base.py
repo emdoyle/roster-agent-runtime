@@ -25,6 +25,7 @@ class LocalAgent(ABC):
     @abstractmethod
     async def trigger_action(
         self,
+        step: str,
         action: str,
         inputs: dict[str, str],
         role_context: str,
@@ -68,6 +69,7 @@ class BaseLocalAgent(LocalAgent):
 
     async def trigger_action(
         self,
+        step: str,
         action: str,
         inputs: dict[str, str],
         role_context: str,
@@ -95,6 +97,7 @@ class BaseLocalAgent(LocalAgent):
         outgoing_message = OutgoingMessage.workflow_action_result(
             record_id=record_id,
             workflow=workflow,
+            step=step,
             action=action,
             outputs=action_output,
             error=action_error,

@@ -21,6 +21,7 @@ class AgentHandle(ABC):
     @abstractmethod
     async def trigger_action(
         self,
+        step: str,
         action: str,
         inputs: dict[str, str],
         role_context: str,

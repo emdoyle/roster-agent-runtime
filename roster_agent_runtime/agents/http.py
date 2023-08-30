@@ -76,20 +76,27 @@ class HttpAgentHandle(AgentHandle):
             ) from e
 
     async def trigger_action(
-        self, action: str, inputs: dict[str, str], record_id: str, workflow: str
+        self,
+        step: str,
+        action: str,
+        inputs: dict[str, str],
+        role_context: str,
+        record_id: str,
+        workflow: str,
     ) -> None:
         try:
-            response_data = await self._request(
+            await self._request(
                 "POST",
                 f"{self.url}/trigger-action",
                 json={
+                    "step": step,
                     "action": action,
                     "inputs": inputs,
+                    "role_context": role_context,
                     "record_id": record_id,
                     "workflow": workflow,
                 },
             )
-            return response_data["message"]
         except KeyError as e:
             raise errors.AgentError(
                 f"Failed to parse response from action ({action}) on Agent {self.name}."
