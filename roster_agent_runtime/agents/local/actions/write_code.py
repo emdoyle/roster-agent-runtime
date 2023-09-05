@@ -54,7 +54,7 @@ class WriteCode(LocalAgentAction):
             "stop": None,
             "temperature": 0.3,
         }
-        logger.debug("(write-code) kwargs: %s", kwargs)
+        logger.debug("(write-code) input: %s", user_message)
         response = await openai.ChatCompletion.acreate(**kwargs)
         output = response.choices[0]["message"]["content"]
         with open("code_output.txt", "w") as f:

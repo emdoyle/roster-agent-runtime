@@ -72,7 +72,7 @@ class WritePRD(LocalAgentAction):
             "stop": None,
             "temperature": 0.3,
         }
-        logger.debug("(write-prd) kwargs: %s", kwargs)
+        logger.debug("(write-prd) input: %s", user_message)
         response = await openai.ChatCompletion.acreate(**kwargs)
         output = response.choices[0]["message"]["content"]
         with open("prd_output.txt", "w") as f:

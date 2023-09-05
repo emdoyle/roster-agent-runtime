@@ -43,20 +43,15 @@ If all requirements appear to be satisfied, make minimal changes (comments, form
 class RefineCode(LocalAgentAction):
     KEY = "RefineCode"
 
-    async def execute(
-        self, inputs: dict[str, str], context: str = ""
-    ) -> dict[str, str]:
-        try:
-            requirements = inputs["requirements_document"]
-            code = inputs["code"]
-        except KeyError as e:
-            raise KeyError(f"Missing required input for {self.KEY}: {e}")
+    async def _refine_code(
+        self, role: str, requirements: str, code: str, filename: str = "main.py"
+    ):
         system_message = {"content": SYSTEM_PROMPT, "role": "system"}
         prompt = PROMPT_TEMPLATE.format(
-            role=context,
+            role=role,
             requirements=requirements,
             original_code=code,
-            filename="main.py",
+            filename=filename,
         )
         user_message = {"content": prompt, "role": "user"}
         kwargs = {
@@ -67,11 +62,28 @@ class RefineCode(LocalAgentAction):
             "stop": None,
             "temperature": 0.3,
         }
-        logger.debug("(refine-code) kwargs: %s", kwargs)
+        logger.debug("(refine-code) input: %s", user_message)
         response = await openai.ChatCompletion.acreate(**kwargs)
         output = response.choices[0]["message"]["content"]
-        with open("refined_code_output.txt", "w") as f:
-            f.write(output)
         logger.debug("(refine-code) output: %s", output)
+        return output
 
-        return {"refined_code": output}
+    async def execute(
+        self, inputs: dict[str, str], context: str = ""
+    ) -> dict[str, str]:
+        try:
+            requirements = inputs["requirements_document"]
+            code = inputs["code"]
+        except KeyError as e:
+            raise KeyError(f"Missing required input for {self.KEY}: {e}")
+
+        rounds = inputs.get("rounds", 1)
+        for i in range(rounds):
+            logger.debug("(refine-code) round: %s", i)
+            code = await self._refine_code(
+                role=context, requirements=requirements, code=code
+            )
+            with open(f"refined_code_output_{i}.txt", "w") as f:
+                f.write(code)
+
+        return {"refined_code": code}

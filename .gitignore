@@ -23,7 +23,7 @@ build/
 
 # Ad-hoc testing files
 test.py
-*_output.txt
+*_output*.txt
 
 # Environment config
 .env
