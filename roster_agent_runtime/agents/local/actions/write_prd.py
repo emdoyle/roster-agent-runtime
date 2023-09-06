@@ -49,6 +49,17 @@ The product should be a ...
 """
 
 
+class DummyWritePRD(LocalAgentAction):
+    KEY = "DistillFeatureRequirements"
+
+    async def execute(
+        self, inputs: dict[str, str], context: str = ""
+    ) -> dict[str, str]:
+        with open("prd_output.txt", "r") as f:
+            reqs = f.read()
+            return {"requirements_document": reqs}
+
+
 class WritePRD(LocalAgentAction):
     KEY = "DistillFeatureRequirements"
 

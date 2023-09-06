@@ -1,3 +1,4 @@
+import json
 import os
 
 import openai
@@ -31,6 +32,22 @@ Write code enclosed in triple backticks, keeping in mind the following rules and
 ```"""
 
 
+class DummyWriteCode(LocalAgentAction):
+    KEY = "WriteCode"
+
+    async def execute(
+        self, inputs: dict[str, str], context: str = ""
+    ) -> dict[str, str]:
+        with open("code_output.txt", "r") as f:
+            code = f.read()
+            code_output = {
+                "kind": "new_file",
+                "filepath": "blackjack.py",
+                "content": code,
+            }
+            return {"code": json.dumps(code_output)}
+
+
 class WriteCode(LocalAgentAction):
     KEY = "WriteCode"
 
@@ -39,6 +56,8 @@ class WriteCode(LocalAgentAction):
     ) -> dict[str, str]:
         try:
             requirements = inputs["requirements_document"]
+            codebase_tree = inputs["codebase_tree"]
+            implementation_plan = inputs["implementation_plan"]
         except KeyError as e:
             raise KeyError(f"Missing required input for {self.KEY}: {e}")
         system_message = {"content": SYSTEM_PROMPT, "role": "system"}
@@ -61,4 +80,10 @@ class WriteCode(LocalAgentAction):
             f.write(output)
         logger.debug("(write-code) output: %s", output)
 
-        return {"code": output}
+        python_code = output.split("```python")[1].split("```")[0].strip()
+        code_output = {
+            "kind": "new_file",
+            "filepath": "main.py",
+            "content": python_code,
+        }
+        return {"code": json.dumps(code_output)}

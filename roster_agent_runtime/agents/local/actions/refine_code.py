@@ -1,3 +1,4 @@
+import json
 import os
 
 import openai
@@ -40,6 +41,22 @@ If all requirements appear to be satisfied, make minimal changes (comments, form
 """
 
 
+class DummyRefineCode(LocalAgentAction):
+    KEY = "RefineCode"
+
+    async def execute(
+        self, inputs: dict[str, str], context: str = ""
+    ) -> dict[str, str]:
+        with open("refined_code_output_0.txt", "r") as f:
+            code = f.read()
+            code_output = {
+                "kind": "new_file",
+                "filepath": "blackjack.py",
+                "content": code,
+            }
+            return {"refined_code": json.dumps(code_output)}
+
+
 class RefineCode(LocalAgentAction):
     KEY = "RefineCode"
 
@@ -74,6 +91,7 @@ class RefineCode(LocalAgentAction):
         try:
             requirements = inputs["requirements_document"]
             code = inputs["code"]
+            codebase_tree = inputs["codebase_tree"]
         except KeyError as e:
             raise KeyError(f"Missing required input for {self.KEY}: {e}")
 
@@ -86,4 +104,10 @@ class RefineCode(LocalAgentAction):
             with open(f"refined_code_output_{i}.txt", "w") as f:
                 f.write(code)
 
-        return {"refined_code": code}
+        python_code = code.split("```python")[1].split("```")[0].strip()
+        code_output = {
+            "kind": "new_file",
+            "filepath": "main.py",
+            "content": python_code,
+        }
+        return {"refined_code": json.dumps(code_output)}
