@@ -1,6 +1,7 @@
 from typing import Optional
 
 from pydantic import BaseModel, Field
+from roster_agent_runtime.models.files import FileContents
 
 
 class WorkflowActionTriggerPayload(BaseModel):
@@ -49,6 +50,44 @@ class WorkflowMessage(BaseModel):
         }
 
 
+class ReadFileResponsePayload(BaseModel):
+    files: list[FileContents] = Field(
+        default_factory=list,
+        description="The file contents which were requested from the workspace tool.",
+    )
+
+    class Config:
+        validate_assignment = True
+        schema_extra = {
+            "example": {
+                "files": [
+                    FileContents.Config.schema_extra["example"],
+                    FileContents.Config.schema_extra["example"],
+                ]
+            }
+        }
+
+
+class ToolMessage(BaseModel):
+    id: str = Field(description="An identifier for this tool invocation.")
+    kind: str = Field(description="The kind of the message data.")
+    tool: str = Field(description="The tool which this message refers to.")
+    data: dict = Field(default_factory=dict, description="The data of the message.")
+
+    class Config:
+        validate_assignment = True
+        schema_extra = {
+            "example": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "tool": "ToolName",
+                "kind": "tool_response",
+                "data": {
+                    "outputs": {"output1": "value1", "output2": "value2"},
+                },
+            }
+        }
+
+
 class Recipient(BaseModel):
     kind: str = Field(
         description="The kind of recipient (agent, roster-admin, tool etc.)"
@@ -71,6 +110,10 @@ class Recipient(BaseModel):
     @classmethod
     def workflow_router(cls, namespace: str = "default") -> "Recipient":
         return cls(kind="roster-admin", name="workflow-router", namespace=namespace)
+
+    @classmethod
+    def workspace_manager(cls, namespace: str = "default") -> "Recipient":
+        return cls(kind="roster-admin", name="workspace-manager", namespace=namespace)
 
 
 class OutgoingMessage(BaseModel):
@@ -110,5 +153,17 @@ class OutgoingMessage(BaseModel):
                     "outputs": outputs,
                     "error": error,
                 },
+            },
+        )
+
+    @classmethod
+    def tool_invocation(cls, invocation_id: str, tool: str, inputs: dict):
+        return cls(
+            recipient=Recipient.workspace_manager(),
+            payload={
+                "id": invocation_id,
+                "kind": "tool_invocation",
+                "tool": tool,
+                "inputs": inputs,
             },
         )

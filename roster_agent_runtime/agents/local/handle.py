@@ -78,6 +78,13 @@ class LocalAgentHandle(AgentHandle):
             workflow=workflow,
         )
 
+    async def handle_tool_response(
+        self, invocation_id: str, tool: str, data: dict
+    ) -> None:
+        await self.agent.handle_tool_response(
+            invocation_id=invocation_id, tool=tool, data=data
+        )
+
     async def outgoing_message_stream(self) -> AsyncIterator[OutgoingMessage]:
         async for message in self.agent.outgoing_message_stream():
             yield message

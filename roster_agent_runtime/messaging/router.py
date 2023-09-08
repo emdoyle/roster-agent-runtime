@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import Optional
 
+import pydantic
 from roster_agent_runtime.agents import AgentHandle
 from roster_agent_runtime.agents.pool import AgentPool
 from roster_agent_runtime.informers.events.spec import RosterResourceEvent
@@ -10,6 +11,7 @@ from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.messaging import (
     OutgoingMessage,
     Recipient,
+    ToolMessage,
     WorkflowActionTriggerPayload,
     WorkflowMessage,
 )
@@ -62,12 +64,47 @@ class AgentMessageRouter:
     async def handle_incoming_message(self, message: str):
         try:
             message_data = json.loads(message)
-            workflow_message = WorkflowMessage(**message_data)
+            message_kind = message_data["kind"]
+        except (json.JSONDecodeError, KeyError):
+            logger.debug(
+                "(agent-router) Failed to parse incoming message: %s",
+                message,
+            )
+            return
+
+        if message_kind == "trigger_action":
+            try:
+                workflow_message = WorkflowMessage(**message_data)
+            except (pydantic.ValidationError, TypeError, ValueError):
+                logger.debug(
+                    "(agent-router) Failed to parse message data as workflow message: %s",
+                    message_data,
+                )
+                return
+            await self._handle_action_trigger(workflow_message)
+        elif message_kind == "tool_response":
+            try:
+                tool_message = ToolMessage(**message_data)
+            except (pydantic.ValidationError, TypeError, ValueError):
+                logger.debug(
+                    "(agent-router) Failed to parse message data as tool message: %s",
+                    message_data,
+                )
+                return
+            await self._handle_tool_response(tool_message)
+        else:
+            logger.debug(
+                "(agent-router) Received message with unknown kind: %s",
+                message_kind,
+            )
+
+    async def _handle_action_trigger(self, workflow_message: WorkflowMessage):
+        try:
             action_trigger = WorkflowActionTriggerPayload(**workflow_message.data)
         except (json.JSONDecodeError, TypeError, ValueError):
             logger.debug(
-                "(agent-router) Failed to parse incoming message as action trigger: %s",
-                message,
+                "(agent-router) Failed to parse message data as action trigger: %s",
+                workflow_message.data,
             )
             return
 
@@ -83,6 +120,16 @@ class AgentMessageRouter:
             )
         except Exception as e:
             logger.debug("(agent-router) Failed to trigger action: %s", e)
+
+    async def _handle_tool_response(self, tool_message: ToolMessage):
+        try:
+            await self.agent_handle.handle_tool_response(
+                invocation_id=tool_message.id,
+                tool=tool_message.tool,
+                data=tool_message.data,
+            )
+        except Exception as e:
+            logger.debug("(agent-router) Failed to handle tool response: %s", e)
 
     async def consume_outgoing_messages(self):
         # TODO: resiliency if the stream is broken

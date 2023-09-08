@@ -30,6 +30,12 @@ class AgentHandle(ABC):
     ) -> None:
         """Trigger an Action implemented by the Agent"""
 
+    @abstractmethod
+    async def handle_tool_response(
+        self, invocation_id: str, tool: str, data: dict
+    ) -> None:
+        """Handle a response received from a Tool used by the Agent"""
+
     # ASYNCITERDEF: 'def' in interface only to workaround type hint deficiency
     #   AsyncIterator needs 'yield' keyword in implementation (absent in interface)
     @abstractmethod

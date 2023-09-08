@@ -102,6 +102,20 @@ class HttpAgentHandle(AgentHandle):
                 f"Failed to parse response from action ({action}) on Agent {self.name}."
             ) from e
 
+    async def handle_tool_response(
+        self, invocation_id: str, tool: str, data: dict
+    ) -> None:
+        try:
+            await self._request(
+                "POST",
+                f"{self.url}/tool-response",
+                json={"invocation_id": invocation_id, "tool": tool, "data": data},
+            )
+        except KeyError as e:
+            raise errors.AgentError(
+                f"Failed to parse response from tool ({tool}) on Agent {self.name}."
+            ) from e
+
     async def _byte_stream(self, path: str) -> AsyncIterator[bytes]:
         async with aiohttp.ClientSession() as session:
             async with session.get(f"{self.url}/{path}") as resp:
