@@ -18,28 +18,28 @@ class LocalAgentHandle(AgentHandle):
 
     @classmethod
     def build(
-        cls, name: str, package: str = "roster_agent_runtime.agents.local"
+        cls, name: str, image: str, package: str = "roster_agent_runtime.agents.local"
     ) -> "LocalAgentHandle":
         # dynamic import of agent module from name
         try:
-            module = importlib.import_module(f"{package}.{name}")
+            module = importlib.import_module(f"{package}.{image}")
         except (ModuleNotFoundError, ImportError):
-            raise errors.AgentNotFoundError(agent=name)
+            raise errors.AgentNotFoundError(agent=image)
 
         # get the agent class from the module
         try:
             agent_class = getattr(module, "AGENT_CLASS")
         except AttributeError:
-            raise errors.AgentNotFoundError(agent=name)
+            raise errors.AgentNotFoundError(agent=image)
 
         # check that the agent class is a subclass of LocalAgent
         try:
             assert issubclass(agent_class, LocalAgent)
         except AssertionError:
-            raise errors.AgentNotFoundError(agent=name)
+            raise errors.AgentNotFoundError(agent=image)
 
         # instantiate the agent class
-        agent = agent_class()
+        agent = agent_class(name=name, namespace="default")
         return cls(agent=agent)
 
     async def chat(

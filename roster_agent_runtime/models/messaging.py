@@ -73,6 +73,10 @@ class ToolMessage(BaseModel):
     kind: str = Field(description="The kind of the message data.")
     tool: str = Field(description="The tool which this message refers to.")
     data: dict = Field(default_factory=dict, description="The data of the message.")
+    error: str = Field(
+        default="",
+        description="An error message returned by the tool, if any.",
+    )
 
     class Config:
         validate_assignment = True
@@ -84,6 +88,7 @@ class ToolMessage(BaseModel):
                 "data": {
                     "outputs": {"output1": "value1", "output2": "value2"},
                 },
+                "error": "",
             }
         }
 
@@ -156,14 +161,25 @@ class OutgoingMessage(BaseModel):
             },
         )
 
+    # TODO: name/namespace Sender info should be added throughout the messaging system
     @classmethod
-    def tool_invocation(cls, invocation_id: str, tool: str, inputs: dict):
+    def tool_invocation(
+        cls,
+        invocation_id: str,
+        tool: str,
+        inputs: dict,
+        name: str,
+        namespace: str = "default",
+    ):
         return cls(
             recipient=Recipient.workspace_manager(),
             payload={
                 "id": invocation_id,
-                "kind": "tool_invocation",
                 "tool": tool,
-                "inputs": inputs,
+                "kind": "tool_invocation",
+                "sender": {"name": name, "namespace": namespace},
+                "data": {
+                    "inputs": inputs,
+                },
             },
         )

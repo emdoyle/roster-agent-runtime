@@ -44,7 +44,7 @@ class LocalAgentExecutor(AgentExecutor):
             raise errors.AgentAlreadyExistsError(agent=agent.name)
 
         # Agent 'image' attribute is used to identify the agent class to import
-        agent_handle = LocalAgentHandle.build(name=agent.image)
+        agent_handle = LocalAgentHandle.build(name=agent.name, image=agent.image)
         self.store.agents[agent.name] = self._local_agent_status(agent=agent)
         self.agent_handles[agent.name] = agent_handle
 
@@ -55,7 +55,7 @@ class LocalAgentExecutor(AgentExecutor):
             raise errors.AgentNotFoundError(agent=agent.name)
 
         # Rebuild the agent handle in case the image has changed
-        self.agent_handles[agent.name] = LocalAgentHandle.build(name=agent.image)
+        self.agent_handles[agent.name] = LocalAgentHandle.build(image=agent.image)
         return self.store.agents[agent.name]
 
     async def delete_agent(self, name: str) -> None:

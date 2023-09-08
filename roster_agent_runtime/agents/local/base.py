@@ -19,6 +19,10 @@ logger = app_logger()
 
 
 class LocalAgent(ABC):
+    def __init__(self, name: str, namespace: str = "default", *args, **kwargs):
+        self.name = name
+        self.namespace = namespace
+
     @abstractmethod
     async def chat(
         self,
@@ -68,6 +72,7 @@ class BaseLocalAgent(LocalAgent):
     AGENT_CONTEXT: dict = NotImplemented
 
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._pending_tool_invocations: dict[str, asyncio.Future] = {}
         self._outgoing_message_queue = asyncio.Queue()
         self._activity_stream_queue = asyncio.Queue()
@@ -151,7 +156,11 @@ class BaseLocalAgent(LocalAgent):
         self._pending_tool_invocations[invocation_id] = tool_response_future
 
         outgoing_message = OutgoingMessage.tool_invocation(
-            invocation_id=invocation_id, tool=tool, inputs=inputs
+            invocation_id=invocation_id,
+            tool=tool,
+            inputs=inputs,
+            name=self.name,
+            namespace=self.namespace,
         )
         await self._outgoing_message_queue.put(outgoing_message)
 

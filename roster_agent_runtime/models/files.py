@@ -1,10 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FileContents(BaseModel):
     filename: str
     text: str
-    metadata: dict
+    metadata: dict = Field(default_factory=dict)
 
     class Config:
         validate_assignment = True
