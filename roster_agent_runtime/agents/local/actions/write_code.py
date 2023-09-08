@@ -4,6 +4,7 @@ import re
 import xml.etree.ElementTree as ElementTree
 
 import openai
+from roster_agent_runtime.agents.local.base import BaseLocalAgent
 from roster_agent_runtime.logs import app_logger
 
 from .base import SYSTEM_PROMPT, LocalAgentAction
@@ -86,7 +87,9 @@ class DummyWriteCode(LocalAgentAction):
     KEY = "WriteCode"
 
     async def execute(
-        self, inputs: dict[str, str], context: str = ""
+        self,
+        inputs: dict[str, str],
+        context: str = "",
     ) -> dict[str, str]:
         with open("code_output.txt", "r") as f:
             code = f.read()
@@ -104,7 +107,9 @@ class WriteCode(LocalAgentAction):
     output_regex = re.compile(r"(<code>.*?</code>)", re.DOTALL)
 
     async def execute(
-        self, inputs: dict[str, str], context: str = ""
+        self,
+        inputs: dict[str, str],
+        context: str = "",
     ) -> dict[str, str]:
         try:
             implementation_plan = inputs["implementation_plan"]
@@ -122,12 +127,17 @@ class WriteCode(LocalAgentAction):
                     implementation_plan=implementation_plan,
                 )
             elif action["type"] == "modify":
-                # this part is actually not so clear!!
-                # the workspace exists way on another machine
-                # does this mean the agent needs to ask/wait for the contents via messaging?
-                # does this mean the WorkflowRouter should parse the messages and embed content?
-                # should there be a protected API to make this request to the API server directly?
-                file_contents = ...
+                # pull bulk earlier
+                # TODO: raise an error if message router isn't running/listening for Agent
+                logger.debug("(write-code) About to read file: %s", action["filename"])
+                file_contents = await self.agent.read_files(
+                    filepaths=[action["filename"]],
+                    record_id=self.record_id,
+                    workflow=self.workflow,
+                )
+                logger.debug(
+                    "(write-code) Read file: %s; %s", action["filename"], file_contents
+                )
                 prompt = MODIFY_FILE_PROMPT_TEMPLATE.format(
                     role=context,
                     filename=action["filename"],
@@ -147,7 +157,7 @@ class WriteCode(LocalAgentAction):
             user_message = {"content": prompt, "role": "user"}
             kwargs = {
                 "api_key": os.environ["OPENAI_API_KEY"],
-                "model": "davinci",
+                "model": "gpt-4",
                 "messages": [system_message, user_message],
                 "n": 1,
                 "stop": None,
@@ -158,7 +168,7 @@ class WriteCode(LocalAgentAction):
             output = response.choices[0]["message"]["content"]
             logger.debug("(write-code) output: %s", output)
 
-            code_match = output.search(self.output_regex)
+            code_match = self.output_regex.search(output)
             code_content = code_match.group(1) if code_match else None
             code_outputs.append(
                 {

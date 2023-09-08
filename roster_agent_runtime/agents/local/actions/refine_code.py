@@ -47,14 +47,7 @@ class DummyRefineCode(LocalAgentAction):
     async def execute(
         self, inputs: dict[str, str], context: str = ""
     ) -> dict[str, str]:
-        with open("refined_code_output_0.txt", "r") as f:
-            code = f.read()
-            code_output = {
-                "kind": "new_file",
-                "filepath": "blackjack.py",
-                "content": code,
-            }
-            return {"refined_code": json.dumps(code_output)}
+        return {"refined_code": inputs["code"]}
 
 
 class RefineCode(LocalAgentAction):

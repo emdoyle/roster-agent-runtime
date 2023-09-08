@@ -55,9 +55,7 @@ class DummyWritePRD(LocalAgentAction):
     async def execute(
         self, inputs: dict[str, str], context: str = ""
     ) -> dict[str, str]:
-        with open("prd_output.txt", "r") as f:
-            reqs = f.read()
-            return {"requirements_document": reqs}
+        return {"requirements_document": "Do whatever you want"}
 
 
 class WritePRD(LocalAgentAction):

@@ -2,11 +2,11 @@ import importlib
 from typing import AsyncIterator
 
 from roster_agent_runtime import errors
+from roster_agent_runtime.agents.base import AgentHandle
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.conversation import ConversationMessage
 from roster_agent_runtime.models.messaging import OutgoingMessage
 
-from ..base import AgentHandle
 from .base import LocalAgent
 
 logger = app_logger()

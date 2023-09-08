@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from abc import ABC, abstractmethod
-from typing import AsyncIterator
+from typing import TYPE_CHECKING, AsyncIterator
 
 import pydantic
 from roster_agent_runtime import errors
@@ -13,7 +13,8 @@ from roster_agent_runtime.models.messaging import (
     ReadFileResponsePayload,
 )
 
-from .actions.base import LocalAgentAction
+if TYPE_CHECKING:
+    from .actions.base import LocalAgentAction
 
 logger = app_logger()
 
@@ -48,6 +49,12 @@ class LocalAgent(ABC):
         ...
 
     @abstractmethod
+    async def read_files(
+        self, filepaths: list[str], record_id: str, workflow: str
+    ) -> list[FileContents]:
+        ...
+
+    @abstractmethod
     async def handle_tool_response(
         self, invocation_id: str, tool: str, data: dict
     ) -> None:
@@ -68,7 +75,7 @@ class LocalAgent(ABC):
 
 class BaseLocalAgent(LocalAgent):
     NAME: str = NotImplemented
-    ACTIONS: list[LocalAgentAction] = NotImplemented
+    ACTIONS: list["LocalAgentAction"] = NotImplemented
     AGENT_CONTEXT: dict = NotImplemented
 
     def __init__(self, *args, **kwargs):
@@ -111,7 +118,12 @@ class BaseLocalAgent(LocalAgent):
         action_output: dict[str, str] = {}
         action_error: str = ""
         try:
-            action_output = await action_class().execute(inputs, context=role_context)
+            action_output = await action_class(
+                agent=self, record_id=record_id, workflow=workflow
+            ).execute(
+                inputs=inputs,
+                context=role_context,
+            )
         except Exception as e:
             action_error = str(e)
 

@@ -1,10 +1,10 @@
-from .actions.write_prd import WritePRD
+from .actions.write_prd import DummyWritePRD, WritePRD
 from .base import BaseLocalAgent
 
 
 class ProductManager(BaseLocalAgent):
     NAME = "Product Manager"
-    ACTIONS = [WritePRD]
+    ACTIONS = [DummyWritePRD]
     AGENT_CONTEXT = {}
 
 

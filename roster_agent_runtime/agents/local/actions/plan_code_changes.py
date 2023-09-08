@@ -86,9 +86,15 @@ class DummyPlanCodeChanges(LocalAgentAction):
     async def execute(
         self, inputs: dict[str, str], context: str = ""
     ) -> dict[str, str]:
-        with open("plan_code_changes_output.txt", "r") as f:
-            plan = f.read()
-            return {"implementation_plan": plan}
+        return {
+            "implementation_plan": """
+<plan>
+<modify file="roster_api/main.py">
+* Add a nice comment to the top of the file ending with a smiley face
+</modify>
+</plan>
+"""
+        }
 
 
 class PlanCodeChanges(LocalAgentAction):
