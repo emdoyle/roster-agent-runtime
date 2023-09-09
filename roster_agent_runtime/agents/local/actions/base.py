@@ -1,3 +1,4 @@
+import os
 from abc import ABC, abstractmethod
 
 from roster_agent_runtime.agents.local.base import LocalAgent
@@ -35,5 +36,11 @@ class BaseLocalAgentAction(LocalAgentAction, ABC):
 
     # quick-and-dirty for local observability
     def store_output(self, output: str):
-        with open(f"action_outputs/{self.KEY}/{self.record_id}.txt") as f:
+        output_path = f"action_outputs/{self.KEY}"
+
+        # Ensure the directory exists
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+
+        with open(f"{output_path}/{self.record_id}.txt", "w") as f:
             f.write(output)
