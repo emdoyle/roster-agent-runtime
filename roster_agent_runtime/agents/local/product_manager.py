@@ -4,7 +4,7 @@ from .base import BaseLocalAgent
 
 class ProductManager(BaseLocalAgent):
     NAME = "Product Manager"
-    ACTIONS = [DummyWritePRD]
+    ACTIONS = [WritePRD]
     AGENT_CONTEXT = {}
 
 

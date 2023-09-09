@@ -6,7 +6,7 @@ from .base import BaseLocalAgent
 
 class WebDeveloper(BaseLocalAgent):
     NAME = "Web Developer"
-    ACTIONS = [DummyPlanCodeChanges, WriteCode, DummyRefineCode]
+    ACTIONS = [PlanCodeChanges, WriteCode, RefineCode]
     AGENT_CONTEXT = {}
 
 
