@@ -128,4 +128,8 @@ class RefineCode(BaseLocalAgentAction):
                 )
                 refined_code.append(new_code_output)
 
-        return {"refined_code": json.dumps(refined_code)}
+        final_refined_code_output = json.dumps(
+            [code_output.dict() for code_output in refined_code]
+        )
+        self.store_output(final_refined_code_output)
+        return {"refined_code": final_refined_code_output}

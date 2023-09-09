@@ -162,6 +162,8 @@ class WriteCode(BaseLocalAgentAction):
                 )
             )
 
-        final_code_output = json.dumps(code_outputs)
+        final_code_output = json.dumps(
+            [code_output.dict() for code_output in code_outputs]
+        )
         self.store_output(final_code_output)
         return {"code": final_code_output}
