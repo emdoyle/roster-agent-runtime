@@ -27,7 +27,7 @@ Here are some tips:
 
 -----
 ## Original request
-{requirements}
+{change_request}
 -----
 ## The Plan
 {plan}
@@ -58,14 +58,14 @@ class RefineCode(BaseLocalAgentAction):
     async def _refine_code(
         self,
         role: str,
-        requirements: str,
+        change_request: str,
         code: CodeOutput,
         plan: ImplementationPlanAction,
     ) -> CodeOutput:
         system_message = {"content": SYSTEM_PROMPT, "role": "system"}
         prompt = PROMPT_TEMPLATE.format(
             role=role,
-            requirements=requirements,
+            change_request=change_request,
             original_code=code.content,
             filename=code.filepath,
             plan=plan.plan,
@@ -100,7 +100,7 @@ class RefineCode(BaseLocalAgentAction):
         self, inputs: dict[str, str], context: str = ""
     ) -> dict[str, str]:
         try:
-            requirements = inputs["requirements_document"]
+            change_request = inputs["change_request"]
             implementation_plan = inputs["implementation_plan"]
             code = inputs["code"]
         except KeyError as e:
@@ -122,7 +122,7 @@ class RefineCode(BaseLocalAgentAction):
                 action = actions_by_filename[code_output.filepath]
                 new_code_output = await self._refine_code(
                     role=context,
-                    requirements=requirements,
+                    change_request=change_request,
                     code=code_output,
                     plan=action,
                 )
