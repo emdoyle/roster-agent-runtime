@@ -24,6 +24,7 @@ build/
 # Ad-hoc testing files
 test.py
 *_output*.txt
+action_outputs/
 
 # Environment config
 .env

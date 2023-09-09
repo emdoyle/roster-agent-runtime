@@ -3,7 +3,7 @@ import os
 import openai
 from roster_agent_runtime.logs import app_logger
 
-from .base import SYSTEM_PROMPT, LocalAgentAction
+from .base import SYSTEM_PROMPT, BaseLocalAgentAction, LocalAgentAction
 
 logger = app_logger()
 
@@ -58,7 +58,7 @@ class DummyWritePRD(LocalAgentAction):
         return {"requirements_document": "Do whatever you want"}
 
 
-class WritePRD(LocalAgentAction):
+class WritePRD(BaseLocalAgentAction):
     KEY = "DistillFeatureRequirements"
 
     async def execute(
@@ -84,8 +84,7 @@ class WritePRD(LocalAgentAction):
         logger.debug("(write-prd) input: %s", user_message)
         response = await openai.ChatCompletion.acreate(**kwargs)
         output = response.choices[0]["message"]["content"]
-        with open("prd_output.txt", "w") as f:
-            f.write(output)
         logger.debug("(write-prd) output: %s", output)
 
+        self.store_output(output)
         return {"requirements_document": output}

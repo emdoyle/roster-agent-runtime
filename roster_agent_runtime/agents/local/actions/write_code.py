@@ -1,13 +1,13 @@
 import json
 import os
-import re
-import xml.etree.ElementTree as ElementTree
 
 import openai
-from roster_agent_runtime.agents.local.base import BaseLocalAgent
 from roster_agent_runtime.logs import app_logger
 
-from .base import SYSTEM_PROMPT, LocalAgentAction
+from ..parsers.code import CodeOutput
+from ..parsers.plan import ImplementationPlanParser
+from ..parsers.xml import XMLTagContentParser
+from .base import SYSTEM_PROMPT, BaseLocalAgentAction, LocalAgentAction
 
 logger = app_logger()
 
@@ -66,23 +66,6 @@ Write code enclosed in an XML 'code' tag as shown in the Format example, keeping
 """
 
 
-def parse_implementation_plan(implementation_plan: str) -> list[dict]:
-    implementation_actions = []
-    try:
-        root = ElementTree.fromstring(implementation_plan)
-        for action in root:
-            implementation_actions.append(
-                {
-                    "type": action.tag,
-                    "filename": action.get("file"),
-                    "plan": action.text.strip() if action.text else "",
-                }
-            )
-    except ElementTree.ParseError as e:
-        raise ValueError(f"Invalid implementation plan: {e}")
-    return implementation_actions
-
-
 class DummyWriteCode(LocalAgentAction):
     KEY = "WriteCode"
 
@@ -101,10 +84,8 @@ class DummyWriteCode(LocalAgentAction):
             return {"code": json.dumps(code_output)}
 
 
-class WriteCode(LocalAgentAction):
+class WriteCode(BaseLocalAgentAction):
     KEY = "WriteCode"
-
-    output_regex = re.compile(r"(<code>.*?</code>)", re.DOTALL)
 
     async def execute(
         self,
@@ -118,42 +99,46 @@ class WriteCode(LocalAgentAction):
         system_message = {"content": SYSTEM_PROMPT, "role": "system"}
 
         code_outputs = []
-        implementation_actions = parse_implementation_plan(implementation_plan)
+        implementation_actions = ImplementationPlanParser.parse(implementation_plan)
+        modified_filenames = [
+            action.filename
+            for action in implementation_actions
+            if action.type == "modify"
+        ]
+        # TODO: raise an error if message router isn't running/listening for Agent
+        logger.debug("(write-code) About to read files: %s", modified_filenames)
+        file_contents = await self.agent.read_files(
+            filepaths=modified_filenames,
+            record_id=self.record_id,
+            workflow=self.workflow,
+        )
+        logger.debug("(write-code) Read files: %s", modified_filenames)
+        file_contents = {
+            file_content.filename: file_content for file_content in file_contents
+        }
+
         for action in implementation_actions:
-            if action["type"] == "create":
+            if action.type == "create":
                 prompt = CREATE_FILE_PROMPT_TEMPLATE.format(
                     role=context,
-                    filename=action["filename"],
+                    filename=action.filename,
                     implementation_plan=implementation_plan,
                 )
-            elif action["type"] == "modify":
-                # pull bulk earlier
-                # TODO: raise an error if message router isn't running/listening for Agent
-                logger.debug("(write-code) About to read file: %s", action["filename"])
-                file_contents = await self.agent.read_files(
-                    filepaths=[action["filename"]],
-                    record_id=self.record_id,
-                    workflow=self.workflow,
-                )
-                logger.debug(
-                    "(write-code) Read file: %s; %s", action["filename"], file_contents
-                )
+            elif action.type == "modify":
+                current_file_content = file_contents[action.filename]
                 prompt = MODIFY_FILE_PROMPT_TEMPLATE.format(
                     role=context,
-                    filename=action["filename"],
+                    filename=action.filename,
                     implementation_plan=implementation_plan,
-                    file_contents=file_contents,
+                    file_contents=current_file_content,
                 )
-            elif action["type"] == "delete":
+            elif action.type == "delete":
                 code_outputs.append(
-                    {
-                        "kind": "delete_file",
-                        "filepath": action["filename"],
-                    }
+                    CodeOutput(kind="delete_file", filepath=action.filename)
                 )
                 continue
             else:
-                raise ValueError(f"Invalid action type: {action['type']}")
+                raise ValueError(f"Invalid action type: {action.type}")
             user_message = {"content": prompt, "role": "user"}
             kwargs = {
                 "api_key": os.environ["OPENAI_API_KEY"],
@@ -168,17 +153,15 @@ class WriteCode(LocalAgentAction):
             output = response.choices[0]["message"]["content"]
             logger.debug("(write-code) output: %s", output)
 
-            code_match = self.output_regex.search(output)
-            code_content = code_match.group(1) if code_match else None
+            code_content = XMLTagContentParser(tag="code").parse(
+                output, inclusive=False
+            )
             code_outputs.append(
-                {
-                    "kind": "new_file",
-                    "filepath": action["filename"],
-                    "content": code_content,
-                }
+                CodeOutput(
+                    kind="new_file", filepath=action.filename, content=code_content
+                )
             )
 
-        with open("code_output.txt", "w") as f:
-            f.write(json.dumps(code_outputs))
-
-        return {"code": json.dumps(code_outputs)}
+        final_code_output = json.dumps(code_outputs)
+        self.store_output(final_code_output)
+        return {"code": final_code_output}

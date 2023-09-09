@@ -4,7 +4,9 @@ import os
 import openai
 from roster_agent_runtime.logs import app_logger
 
-from .base import SYSTEM_PROMPT, LocalAgentAction
+from ..parsers.code import CodeOutput, CodeOutputParser, RefinedCodeResponseParser
+from ..parsers.plan import ImplementationPlanAction, ImplementationPlanParser
+from .base import SYSTEM_PROMPT, BaseLocalAgentAction, LocalAgentAction
 
 logger = app_logger()
 
@@ -13,31 +15,31 @@ PROMPT_TEMPLATE = """
 Role: {role}
 
 ## Instructions
-Modify the given code to ensure that it meets the requirements faithfully.
-Make minimal changes when possible, and prefer to introduce a new abstraction ONLY when it can significantly reduce the complexity of the code.
-It is possible that the given code fails to satisfy some of the requirements. In such cases, you MUST modify the code to satisfy as many of the requirements as possible.
-If all requirements appear to be satisfied, make minimal changes (comments, formatting etc.) to the code to ensure that it is syntactically valid.
-1. Requirement: Modify the current file ONLY.
-2. Requirement: The file must be syntactically valid. Do NOT add any content after the last line of code.
-3. Requirement: Pay extremely close attention to the provided requirements document, and satisfy as many of the requirements as possible.
-4. Tip: Think before writing. You may include some deliberation and planning in your response, as long as it comes before the formatted code block. Consider what needs to be implemented, and what your preferred design will be.
-5. Tip: CAREFULLY check that all references made in the file actually exist, and that you only use existing APIs.
+You are tasked with refining a single file which has been created or modified by another software engineer as part of an attempt to fulfill a request.
+You will find the contents of this file below. You will also find the original request, along with the portion of the implementation plan which was assigned to this particular file.
+If you believe that the plan has not been followed appropriately, or if there are small mistakes such as typos or missing parameters, please fix them.
+Otherwise, if you believe that the plan was followed appropriately, simply respond with the exact text "OK" within XML 'code' tags as shown in the Format example.
+
+Here are some tips:
+* The file must be syntactically valid. Do NOT add any content after the last line of code.
+* Pay extremely close attention to the provided implementation plan.
+* Think step-by-step before writing. You may include some deliberation and planning in your response, as long as it comes before the XML tag as shown in the Format example.
 
 -----
-## Requirements
+## Original request
 {requirements}
 -----
-## Original Code
+## The Plan
+{plan}
+-----
+## The File
 {original_code}
 -----
 
 ## Format example
------
-## Code: {filename}
-```python
-# {filename}
-<your code here>
-```
+<code>
+[your code here OR simply 'OK']
+</code
 """
 
 
@@ -50,18 +52,23 @@ class DummyRefineCode(LocalAgentAction):
         return {"refined_code": inputs["code"]}
 
 
-class RefineCode(LocalAgentAction):
+class RefineCode(BaseLocalAgentAction):
     KEY = "RefineCode"
 
     async def _refine_code(
-        self, role: str, requirements: str, code: str, filename: str = "main.py"
-    ):
+        self,
+        role: str,
+        requirements: str,
+        code: CodeOutput,
+        plan: ImplementationPlanAction,
+    ) -> CodeOutput:
         system_message = {"content": SYSTEM_PROMPT, "role": "system"}
         prompt = PROMPT_TEMPLATE.format(
             role=role,
             requirements=requirements,
-            original_code=code,
-            filename=filename,
+            original_code=code.content,
+            filename=code.filepath,
+            plan=plan.plan,
         )
         user_message = {"content": prompt, "role": "user"}
         kwargs = {
@@ -76,31 +83,49 @@ class RefineCode(LocalAgentAction):
         response = await openai.ChatCompletion.acreate(**kwargs)
         output = response.choices[0]["message"]["content"]
         logger.debug("(refine-code) output: %s", output)
-        return output
+
+        refined_code_content = RefinedCodeResponseParser(
+            tag="code", refinement_declined_phrase="OK"
+        ).parse(output)
+        # If output indicates refinement is declined, refined_code_content will be None
+        if not refined_code_content:
+            return code
+
+        refined_code_output = CodeOutput(
+            kind=code.kind, filepath=code.filepath, content=refined_code_content
+        )
+        return refined_code_output
 
     async def execute(
         self, inputs: dict[str, str], context: str = ""
     ) -> dict[str, str]:
         try:
             requirements = inputs["requirements_document"]
+            implementation_plan = inputs["implementation_plan"]
             code = inputs["code"]
-            codebase_tree = inputs["codebase_tree"]
         except KeyError as e:
             raise KeyError(f"Missing required input for {self.KEY}: {e}")
 
-        rounds = inputs.get("rounds", 1)
-        for i in range(rounds):
-            logger.debug("(refine-code) round: %s", i)
-            code = await self._refine_code(
-                role=context, requirements=requirements, code=code
-            )
-            with open(f"refined_code_output_{i}.txt", "w") as f:
-                f.write(code)
-
-        python_code = code.split("```python")[1].split("```")[0].strip()
-        code_output = {
-            "kind": "new_file",
-            "filepath": "main.py",
-            "content": python_code,
+        implementation_actions = ImplementationPlanParser.parse(implementation_plan)
+        actions_by_filename = {
+            action.filename: action for action in implementation_actions
         }
-        return {"refined_code": json.dumps(code_output)}
+        code = CodeOutputParser.parse(code)
+        rounds = inputs.get("rounds", 1)
+
+        refined_code = []
+        for code_output in code:
+            for i in range(rounds):
+                logger.debug(
+                    "(refine-code) file: %s, round: %s", code_output.filepath, i
+                )
+                action = actions_by_filename[code_output.filepath]
+                new_code_output = await self._refine_code(
+                    role=context,
+                    requirements=requirements,
+                    code=code_output,
+                    plan=action,
+                )
+                refined_code.append(new_code_output)
+
+        return {"refined_code": json.dumps(refined_code)}

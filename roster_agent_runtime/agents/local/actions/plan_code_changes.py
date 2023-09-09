@@ -1,12 +1,10 @@
 import os
-import re
 
 import openai
-from roster_agent_runtime.agents.local.actions.base import (
-    SYSTEM_PROMPT,
-    LocalAgentAction,
-)
 from roster_agent_runtime.logs import app_logger
+
+from ..parsers.xml import XMLTagContentParser
+from .base import SYSTEM_PROMPT, BaseLocalAgentAction, LocalAgentAction
 
 logger = app_logger()
 
@@ -21,7 +19,6 @@ Then, provide a list of files you would like to modify, abiding by the following
 * Prefer modifying existing files over creating new files
 * Only modify or create files that DEFINITELY need to be touched
 * Use detailed, natural language instructions on what to modify regarding business logic, and do not add low-level details like imports
-* Create/modify up to 5 FILES
 * Do not modify non-text files such as images, svgs, binary, etc
 * Follow the format example carefully, including step-by-step thoughts, a summary of the root cause, and the plan (enclosed in XML tags as shown)
 -----
@@ -97,10 +94,8 @@ class DummyPlanCodeChanges(LocalAgentAction):
         }
 
 
-class PlanCodeChanges(LocalAgentAction):
+class PlanCodeChanges(BaseLocalAgentAction):
     KEY = "PlanCodeChanges"
-
-    output_regex = re.compile(r"(<plan>.*?</plan>)", re.DOTALL)
 
     async def execute(
         self, inputs: dict[str, str], context: str = ""
@@ -126,12 +121,9 @@ class PlanCodeChanges(LocalAgentAction):
         logger.debug("(plan-code) input: %s", user_message)
         response = await openai.ChatCompletion.acreate(**kwargs)
         output = response.choices[0]["message"]["content"]
-
-        with open("plan_code_changes_output.txt", "w") as f:
-            f.write(output)
         logger.debug("(plan-code) output: %s", output)
 
-        plan_match = output.search(self.output_regex)
-        plan_xml_tree = plan_match.group(1) if plan_match else None
+        plan_content = XMLTagContentParser(tag="plan").parse(output)
 
-        return {"implementation_plan": plan_xml_tree}
+        self.store_output(output)
+        return {"implementation_plan": plan_content}
