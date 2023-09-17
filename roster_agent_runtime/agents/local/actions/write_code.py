@@ -141,7 +141,7 @@ class WriteCode(BaseLocalAgentAction):
                 raise ValueError(f"Invalid action type: {action.type}")
             user_message = {"content": prompt, "role": "user"}
             kwargs = {
-                "api_key": os.environ["OPENAI_API_KEY"],
+                "api_key": os.environ["ROSTER_OPENAI_API_KEY"],
                 "model": "gpt-4",
                 "messages": [system_message, user_message],
                 "n": 1,
