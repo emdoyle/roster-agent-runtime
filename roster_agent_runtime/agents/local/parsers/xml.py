@@ -5,7 +5,7 @@ class XMLTagContentParser:
     def __init__(self, tag: str):
         self.tag = tag
         inclusive_pattern = r"(<{tag}>.*?</{tag}>)".format(tag=tag)
-        exclusive_pattern = r"<{tag}>(.*?)</{tag}>".format(tag=tag)
+        exclusive_pattern = r"<{tag}>\n?(.*?)</{tag}>".format(tag=tag)
         self._inclusive_regex_parser = RegexParser(pattern=inclusive_pattern)
         self._exclusive_regex_parser = RegexParser(pattern=exclusive_pattern)
 
