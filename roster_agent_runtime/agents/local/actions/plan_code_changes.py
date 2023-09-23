@@ -96,6 +96,13 @@ class DummyPlanCodeChanges(LocalAgentAction):
 
 class PlanCodeChanges(BaseLocalAgentAction):
     KEY = "PlanCodeChanges"
+    SIGNATURE = (
+        (
+            {"type": "text", "name": "change_request"},
+            {"type": "text", "name": "codebase_tree"},
+        ),
+        ({"type": "text", "name": "implementation_plan"},),
+    )
 
     async def execute(
         self, inputs: dict[str, str], context: str = ""

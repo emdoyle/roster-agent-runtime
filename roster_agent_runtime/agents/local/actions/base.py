@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 
 from roster_agent_runtime.agents.local.base import LocalAgent
 from roster_agent_runtime.logs import app_logger
+from roster_agent_runtime.models.common import TypedArgument
 
 logger = app_logger()
 
@@ -15,7 +16,10 @@ perform the task to the best of your ability, paying close attention to all inst
 
 
 class LocalAgentAction(ABC):
-    KEY = NotImplemented
+    KEY: str = NotImplemented
+    SIGNATURE: tuple[
+        tuple[TypedArgument, ...], tuple[TypedArgument, ...]
+    ] = NotImplemented
 
     @abstractmethod
     async def execute(

@@ -60,6 +60,10 @@ class DummyWritePRD(LocalAgentAction):
 
 class WritePRD(BaseLocalAgentAction):
     KEY = "DistillFeatureRequirements"
+    SIGNATURE = (
+        ({"type": "text", "name": "customer_requests"},),
+        ({"type": "text", "name": "requirements_document"},),
+    )
 
     async def execute(
         self, inputs: dict[str, str], context: str = ""

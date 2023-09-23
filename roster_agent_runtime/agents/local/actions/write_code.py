@@ -86,6 +86,10 @@ class DummyWriteCode(LocalAgentAction):
 
 class WriteCode(BaseLocalAgentAction):
     KEY = "WriteCode"
+    SIGNATURE = (
+        ({"type": "text", "name": "implementation_plan"},),
+        ({"type": "code", "name": "code"},),
+    )
 
     async def execute(
         self,

@@ -54,6 +54,14 @@ class DummyRefineCode(LocalAgentAction):
 
 class RefineCode(BaseLocalAgentAction):
     KEY = "RefineCode"
+    SIGNATURE = (
+        (
+            {"type": "text", "name": "change_request"},
+            {"type": "text", "name": "implementation_plan"},
+            {"type": "code", "name": "code"},
+        ),
+        ({"type": "code", "name": "refined_code"},),
+    )
 
     async def _refine_code(
         self,
