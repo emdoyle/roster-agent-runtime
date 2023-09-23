@@ -1,7 +1,7 @@
 from typing import Optional
 
 from pydantic import BaseModel, Field
-from roster_agent_runtime.models.common import TypedArgument
+from roster_agent_runtime.models.common import TypedArgument, TypedResult
 from roster_agent_runtime.models.files import FileContents
 
 
@@ -144,8 +144,7 @@ class OutgoingMessage(BaseModel):
         workflow: str,
         step: str,
         action: str,
-        outputs: Optional[dict[str, str]] = None,
-        output_types: Optional[tuple[TypedArgument, ...]] = None,
+        outputs: Optional[dict[str, TypedResult]] = None,
         error: str = "",
     ):
         return cls(
@@ -158,7 +157,6 @@ class OutgoingMessage(BaseModel):
                     "step": step,
                     "action": action,
                     "outputs": outputs,
-                    "output_types": output_types,
                     "error": error,
                 },
             },

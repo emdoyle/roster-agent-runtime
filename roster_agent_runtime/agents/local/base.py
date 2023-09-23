@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, AsyncIterator
 import pydantic
 from roster_agent_runtime import errors
 from roster_agent_runtime.logs import app_logger
-from roster_agent_runtime.models.common import TypedArgument
+from roster_agent_runtime.models.common import TypedArgument, TypedResult
 from roster_agent_runtime.models.conversation import ConversationMessage
 from roster_agent_runtime.models.files import FileContents
 from roster_agent_runtime.models.messaging import (
@@ -116,8 +116,7 @@ class BaseLocalAgent(LocalAgent):
         if action_class is None:
             raise errors.AgentError(f"Unknown action: {action} for agent: {self.NAME}")
 
-        action_output: dict[str, str] = {}
-        action_output_types: tuple[TypedArgument, ...] = ()
+        action_outputs: dict[str, TypedResult] = {}
         action_error: str = ""
         try:
             action_output = await action_class(
@@ -127,6 +126,13 @@ class BaseLocalAgent(LocalAgent):
                 context=role_context,
             )
             action_output_types = action_class.SIGNATURE[1]
+            action_outputs = {
+                output_type.name: {
+                    "type": output_type.type,
+                    "value": action_output[output_type.name],
+                }
+                for output_type in action_output_types
+            }
         except Exception as e:
             action_error = str(e)
 
@@ -135,8 +141,7 @@ class BaseLocalAgent(LocalAgent):
             workflow=workflow,
             step=step,
             action=action,
-            outputs=action_output,
-            output_types=action_output_types,
+            outputs=action_outputs,
             error=action_error,
         )
         await self._outgoing_message_queue.put(outgoing_message)

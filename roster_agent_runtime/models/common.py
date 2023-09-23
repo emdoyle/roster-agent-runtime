@@ -13,3 +13,17 @@ class TypedArgument(BaseModel):
                 "type": "ArgumentType",
             }
         }
+
+
+class TypedResult(BaseModel):
+    type: str = Field(description="The type of the result.")
+    value: str = Field(description="The value of the result.")
+
+    class Config:
+        validate_assignment = True
+        schema_extra = {
+            "example": {
+                "type": "text",
+                "value": "value",
+            }
+        }
