@@ -14,6 +14,14 @@ class TypedArgument(BaseModel):
             }
         }
 
+    @classmethod
+    def text(cls, name: str):
+        return cls(type="text", name=name)
+
+    @classmethod
+    def code(cls, name: str):
+        return cls(type="code", name=name)
+
 
 class TypedResult(BaseModel):
     type: str = Field(description="The type of the result.")

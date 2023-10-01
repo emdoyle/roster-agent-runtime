@@ -3,6 +3,7 @@ import os
 
 import openai
 from roster_agent_runtime.logs import app_logger
+from roster_agent_runtime.models.common import TypedArgument
 
 from ..parsers.code import CodeOutput, CodeOutputParser, RefinedCodeResponseParser
 from ..parsers.plan import ImplementationPlanAction, ImplementationPlanParser
@@ -56,11 +57,11 @@ class RefineCode(BaseLocalAgentAction):
     KEY = "RefineCode"
     SIGNATURE = (
         (
-            {"type": "text", "name": "change_request"},
-            {"type": "text", "name": "implementation_plan"},
-            {"type": "code", "name": "code"},
+            TypedArgument.text("change_request"),
+            TypedArgument.text("implementation_plan"),
+            TypedArgument.code("code"),
         ),
-        ({"type": "code", "name": "refined_code"},),
+        (TypedArgument.code("refined_code"),),
     )
 
     async def _refine_code(
@@ -87,10 +88,13 @@ class RefineCode(BaseLocalAgentAction):
             "stop": None,
             "temperature": 0.3,
         }
-        logger.debug("(refine-code) input: %s", user_message)
-        response = await openai.ChatCompletion.acreate(**kwargs)
-        output = response.choices[0]["message"]["content"]
-        logger.debug("(refine-code) output: %s", output)
+        try:
+            response = await openai.ChatCompletion.acreate(**kwargs)
+            output = response.choices[0]["message"]["content"]
+            logger.debug("(refine-code) output: %s", output)
+        except Exception:
+            logger.exception("(refine-code) Failed to call OpenAI")
+            raise
 
         refined_code_content = RefinedCodeResponseParser(
             tag="code", refinement_declined_phrase="OK"

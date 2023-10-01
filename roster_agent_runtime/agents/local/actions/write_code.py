@@ -3,6 +3,7 @@ import os
 
 import openai
 from roster_agent_runtime.logs import app_logger
+from roster_agent_runtime.models.common import TypedArgument
 
 from ..parsers.code import CodeOutput
 from ..parsers.plan import ImplementationPlanParser
@@ -87,8 +88,8 @@ class DummyWriteCode(LocalAgentAction):
 class WriteCode(BaseLocalAgentAction):
     KEY = "WriteCode"
     SIGNATURE = (
-        ({"type": "text", "name": "implementation_plan"},),
-        ({"type": "code", "name": "code"},),
+        (TypedArgument.text("implementation_plan"),),
+        (TypedArgument.code("code"),),
     )
 
     async def execute(
@@ -152,10 +153,13 @@ class WriteCode(BaseLocalAgentAction):
                 "stop": None,
                 "temperature": 0.3,
             }
-            logger.debug("(write-code) input: %s", user_message)
-            response = await openai.ChatCompletion.acreate(**kwargs)
-            output = response.choices[0]["message"]["content"]
-            logger.debug("(write-code) output: %s", output)
+            try:
+                response = await openai.ChatCompletion.acreate(**kwargs)
+                output = response.choices[0]["message"]["content"]
+                logger.debug("(write-code) output: %s", output)
+            except Exception:
+                logger.exception("(write-code) Failed to call OpenAI")
+                raise
 
             code_content = XMLTagContentParser(tag="code").parse(
                 output, inclusive=False

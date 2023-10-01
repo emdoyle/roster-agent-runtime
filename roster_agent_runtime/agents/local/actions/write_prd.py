@@ -2,6 +2,7 @@ import os
 
 import openai
 from roster_agent_runtime.logs import app_logger
+from roster_agent_runtime.models.common import TypedArgument
 
 from .base import SYSTEM_PROMPT, BaseLocalAgentAction, LocalAgentAction
 
@@ -61,8 +62,8 @@ class DummyWritePRD(LocalAgentAction):
 class WritePRD(BaseLocalAgentAction):
     KEY = "DistillFeatureRequirements"
     SIGNATURE = (
-        ({"type": "text", "name": "customer_requests"},),
-        ({"type": "text", "name": "requirements_document"},),
+        (TypedArgument.text("customer_requests"),),
+        (TypedArgument.text("requirements_document"),),
     )
 
     async def execute(

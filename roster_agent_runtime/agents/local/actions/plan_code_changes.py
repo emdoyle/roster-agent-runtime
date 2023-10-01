@@ -2,6 +2,7 @@ import os
 
 import openai
 from roster_agent_runtime.logs import app_logger
+from roster_agent_runtime.models.common import TypedArgument
 
 from ..parsers.xml import XMLTagContentParser
 from .base import SYSTEM_PROMPT, BaseLocalAgentAction, LocalAgentAction
@@ -98,10 +99,10 @@ class PlanCodeChanges(BaseLocalAgentAction):
     KEY = "PlanCodeChanges"
     SIGNATURE = (
         (
-            {"type": "text", "name": "change_request"},
-            {"type": "text", "name": "codebase_tree"},
+            TypedArgument.text("change_request"),
+            TypedArgument.text("codebase_tree"),
         ),
-        ({"type": "text", "name": "implementation_plan"},),
+        (TypedArgument.text("implementation_plan"),),
     )
 
     async def execute(
@@ -126,9 +127,13 @@ class PlanCodeChanges(BaseLocalAgentAction):
             "temperature": 0.3,
         }
         logger.debug("(plan-code) input: %s", user_message)
-        response = await openai.ChatCompletion.acreate(**kwargs)
-        output = response.choices[0]["message"]["content"]
-        logger.debug("(plan-code) output: %s", output)
+        try:
+            response = await openai.ChatCompletion.acreate(**kwargs)
+            output = response.choices[0]["message"]["content"]
+            logger.debug("(plan-code) output: %s", output)
+        except Exception:
+            logger.exception("(plan-code) Failed to call OpenAI")
+            raise
 
         plan_content = XMLTagContentParser(tag="plan").parse(output)
 
