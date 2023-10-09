@@ -1,3 +1,5 @@
+from typing import Generator
+
 from .regex import RegexParser
 
 
@@ -13,3 +15,9 @@ class XMLTagContentParser:
         if inclusive:
             return self._inclusive_regex_parser.parse(content)
         return self._exclusive_regex_parser.parse(content)
+
+    def matches(self, content: str, inclusive: bool = True) -> Generator[str]:
+        if inclusive:
+            yield from self._inclusive_regex_parser.matches(content)
+        else:
+            yield from self._exclusive_regex_parser.matches(content)
