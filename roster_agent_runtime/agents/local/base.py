@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, AsyncIterator
 import pydantic
 from roster_agent_runtime import errors
 from roster_agent_runtime.logs import app_logger
-from roster_agent_runtime.models.common import TypedArgument, TypedResult
+from roster_agent_runtime.models.common import TypedResult
 from roster_agent_runtime.models.conversation import ConversationMessage
 from roster_agent_runtime.models.files import FileContents
 from roster_agent_runtime.models.messaging import (
@@ -135,6 +135,7 @@ class BaseLocalAgent(LocalAgent):
             }
         except Exception as e:
             action_error = str(e)
+            logger.debug("(local-agent) Action %s failed: %s", action, e)
 
         outgoing_message = OutgoingMessage.workflow_action_result(
             record_id=record_id,

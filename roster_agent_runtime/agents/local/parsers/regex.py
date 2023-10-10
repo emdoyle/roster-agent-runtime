@@ -11,6 +11,6 @@ class RegexParser:
         content_match = self.regex.search(content)
         return content_match.group(1) if content_match else ""
 
-    def matches(self, content: str) -> Generator[str]:
+    def matches(self, content: str) -> Generator[str, None, None]:
         for content_match in self.regex.finditer(content):
             yield content_match.group(1)

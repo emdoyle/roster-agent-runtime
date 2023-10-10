@@ -44,9 +44,9 @@ def find_match(snippet: str, content: str) -> Span:
     logger.debug(
         "(find-match) returning multi line best fit: %s -> %s",
         best_starting_line,
-        best_ending_line,
+        best_starting_line + best_ending_line,
     )
-    return Span(start=best_starting_line, end=best_ending_line)
+    return Span(start=best_starting_line, end=best_starting_line + best_ending_line)
 
 
 def find_matches(snippets: list[str], content: str) -> list[Span]:

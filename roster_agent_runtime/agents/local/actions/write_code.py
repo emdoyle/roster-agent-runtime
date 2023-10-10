@@ -2,6 +2,7 @@ import json
 
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.common import TypedArgument
+from roster_agent_runtime.models.files import FileContents
 
 from ..parsers.code import CodeOutput
 from ..parsers.plan import ImplementationPlanParser
@@ -148,7 +149,7 @@ class WriteCode(BaseLocalAgentAction):
             workflow=self.workflow,
         )
         logger.debug("(write-code) Read files: %s", modified_filenames)
-        file_contents = {
+        file_contents_by_name: dict[str, FileContents] = {
             file_content.filename: file_content for file_content in file_contents
         }
 
@@ -159,7 +160,7 @@ class WriteCode(BaseLocalAgentAction):
                     filename=action.filename,
                     implementation_plan=implementation_plan,
                 )
-                output = ask_openai(prompt, SYSTEM_PROMPT)
+                output = await ask_openai(prompt, SYSTEM_PROMPT)
                 code_content = XMLTagContentParser(tag="code").parse(
                     output, inclusive=False
                 )
@@ -170,14 +171,15 @@ class WriteCode(BaseLocalAgentAction):
                 )
             elif action.type == "modify":
                 # TODO: handle files which are too long via chunking
-                current_file_content = file_contents[action.filename]
+                current_file_content = file_contents_by_name[action.filename].text
+                current_file_lines = current_file_content.split("\n")
                 extract_snippet_prompt = EXTRACT_SNIPPETS_PROMPT.format(
                     role=context,
                     filename=action.filename,
                     implementation_plan=implementation_plan,
                     file_contents=current_file_content,
                 )
-                extract_snippet_response = ask_openai(
+                extract_snippet_response = await ask_openai(
                     extract_snippet_prompt, SYSTEM_PROMPT
                 )
                 snippets = list(
@@ -203,7 +205,11 @@ class WriteCode(BaseLocalAgentAction):
                     )
                 extracted_snippets = "\n".join(
                     (
-                        f"<snippet>{current_file_content[span.start: span.end + 1]}</snippet>"
+                        "<snippet>\n{snippet_lines}\n</snippet>".format(
+                            snippet_lines="\n".join(
+                                current_file_lines[span.start : span.end + 1]
+                            )
+                        )
                         for span in snippet_spans
                     )
                 )
@@ -213,7 +219,7 @@ class WriteCode(BaseLocalAgentAction):
                     implementation_plan=implementation_plan,
                     extracted_snippets=extracted_snippets,
                 )
-                modify_snippet_response = ask_openai(
+                modify_snippet_response = await ask_openai(
                     modify_snippet_prompt, SYSTEM_PROMPT
                 )
                 modified_snippets = list(
@@ -225,7 +231,7 @@ class WriteCode(BaseLocalAgentAction):
                 modified_file_content = []
                 for i, span in enumerate(snippet_spans):
                     modified_file_content.append(
-                        current_file_content[prev_span_end + 1 : span.start]
+                        "\n".join(current_file_lines[prev_span_end + 1 : span.start])
                     )
                     # NOTE: some concern about mismatching indices here, hopefully not
                     #   a common error case (otherwise might need another fuzzy match round)
@@ -235,7 +241,7 @@ class WriteCode(BaseLocalAgentAction):
                     snippet_spans
                 ), f"Missing snippet spans when constructing modified file ({action.filename})"
                 modified_file_content.append(
-                    current_file_content[snippet_spans[-1].end + 1 :]
+                    "\n".join(current_file_lines[snippet_spans[-1].end + 1 :])
                 )
                 code_outputs.append(
                     CodeOutput(

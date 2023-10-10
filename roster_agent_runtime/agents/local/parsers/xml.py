@@ -16,7 +16,9 @@ class XMLTagContentParser:
             return self._inclusive_regex_parser.parse(content)
         return self._exclusive_regex_parser.parse(content)
 
-    def matches(self, content: str, inclusive: bool = True) -> Generator[str]:
+    def matches(
+        self, content: str, inclusive: bool = True
+    ) -> Generator[str, None, None]:
         if inclusive:
             yield from self._inclusive_regex_parser.matches(content)
         else:

@@ -6,7 +6,7 @@ from roster_agent_runtime.logs import app_logger
 logger = app_logger()
 
 
-def ask_openai(prompt: str, system_message: str, **openai_kwargs):
+async def ask_openai(prompt: str, system_message: str, **openai_kwargs):
     user_message = {"content": prompt, "role": "user"}
     system_message = {"content": system_message, "role": "system"}
     kwargs = {
