@@ -35,8 +35,8 @@ Step-by-step thoughts with explanations:
 * Thought 2
 ...
 
-Root cause:
-[Write an abstract, efficient plan to address this issue in the least amount of change possible. Try to determine the root cause(s) of this issue. Be clear and concise. 1 paragraph.]
+Plan Outline:
+[Write an abstract, efficient plan to implement the requested changes. Try to determine the essence of the request. Be clear and concise.]
 
 <plan>
 <create file="file_path_1">

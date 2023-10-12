@@ -85,10 +85,12 @@ class LocalAgentHandle(AgentHandle):
             invocation_id=invocation_id, tool=tool, data=data
         )
 
+    # NOTE: should only have one consumer on a stream like this
     async def outgoing_message_stream(self) -> AsyncIterator[OutgoingMessage]:
         async for message in self.agent.outgoing_message_stream():
             yield message
 
+    # NOTE: should only have one consumer on a stream like this
     async def activity_stream(self) -> AsyncIterator[dict]:
         async for activity in self.agent.activity_stream():
             yield activity

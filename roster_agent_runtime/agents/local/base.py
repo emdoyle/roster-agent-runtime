@@ -158,6 +158,11 @@ class BaseLocalAgent(LocalAgent):
                 "workflow": workflow,
             },
         )
+
+        if response.get("error"):
+            logger.debug("(local-agent) Failed to read files: %s", response["error"])
+            raise errors.AgentError(f"Failed to read files: {response['error']}")
+
         try:
             result = ReadFileResponsePayload(**response)
         except pydantic.ValidationError as e:
