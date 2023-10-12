@@ -1,0 +1,623 @@
+api/activity.py:
+    - function create_activity( activity: ActivityEvent, service: ActivityService = Depends(get_activity_service) ) (decorators: router.post("/activities", tags=["ActivityEvent"]))
+    - function get_activity_service( conn: asyncpg.Connection = Depends(get_postgres_connection), )
+    - function read_activities( execution_id: str, execution_type: ExecutionType, service: ActivityService = Depends(get_activity_service), ) (decorators: router.get("/activities", tags=["ActivityEvent"]))
+    - variable router
+api/agent.py:
+    - function create_agent(agent: AgentSpec) (decorators: router.post("/agents", tags=["AgentResource"]))
+    - function delete_agent(name: str) (decorators: router.delete("/agents/{name}", tags=["AgentResource"]))
+    - function get_agent(name: str) (decorators: router.get("/agents/{name}", tags=["AgentResource"]))
+    - function list_agents() (decorators: router.get("/agents", tags=["AgentResource"]))
+    - variable router
+    - function update_agent(agent: AgentSpec) (decorators: router.patch("/agents/{name}", tags=["AgentResource"]))
+api/commands.py:
+    - function chat_prompt_agent( request: Request, prompt: ChatPromptAgentArgs ) (decorators: router.post("/agent-chat", tags=["AgentResource", "Command"]))
+    - function initiate_workflow(args: InitiateWorkflowArgs) (decorators: router.post("/initiate-workflow", tags=["WorkflowResource", "Command"]))
+    - variable router
+api/github.py:
+    - function handle_webhook( request: Request, github_app: RosterGithubApp = Depends(get_roster_github_app) ) (decorators: router.post(""))
+    - variable router
+api/identity.py:
+    - function create_identity(identity: IdentitySpec) (decorators: router.post("/identities", tags=["IdentityResource"]))
+    - function delete_identity(name: str) (decorators: router.delete("/identities/{name}", tags=["IdentityResource"]))
+    - function get_identity(name: str) (decorators: router.get("/identities/{name}", tags=["IdentityResource"]))
+    - function list_identities() (decorators: router.get("/identities", tags=["IdentityResource"]))
+    - variable router
+    - function update_identity(identity: IdentitySpec) (decorators: router.patch("/identities/{name}", tags=["IdentityResource"]))
+api/team.py:
+    - function create_team(team: TeamSpec) (decorators: router.post("/teams", tags=["TeamResource"]))
+    - function delete_team(name: str) (decorators: router.delete("/teams/{name}", tags=["TeamResource"]))
+    - function get_team(name: str) (decorators: router.get("/teams/{name}", tags=["TeamResource"]))
+    - function list_teams() (decorators: router.get("/teams", tags=["TeamResource"]))
+    - variable router
+    - function update_team(team: TeamSpec) (decorators: router.patch("/teams/{name}", tags=["TeamResource"]))
+api/updates.py:
+    - function events( request: Request, resource_types: Annotated[Optional[list[str]], Query()] = None, spec_changes: bool = True, status_changes: bool = True, ) (decorators: router.get("/resource-events", tags=["Event"]))
+        - function listener(event: ResourceEvent)
+        - function event_stream()
+    - function handle_status_update(request: Request, status_update: StatusEvent) (decorators: router.post("/status-update", tags=["Event"]))
+    - variable router
+api/workflow.py:
+    - function create_workflow(workflow: WorkflowSpec) (decorators: router.post("/workflows", tags=["WorkflowResource"]))
+    - function delete_workflow(name: str) (decorators: router.delete("/workflows/{name}", tags=["WorkflowResource"]))
+    - function delete_workflow_record(name: str, id: str) (decorators: router.delete("/workflow-records/{name}/{id}", tags=["WorkflowRecord"]))
+    - function get_workflow(name: str) (decorators: router.get("/workflows/{name}", tags=["WorkflowResource"]))
+    - function get_workflow_record(name: str, id: str) (decorators: router.get("/workflow-records/{name}/{id}", tags=["WorkflowRecord"]))
+    - function list_workflow_records(workflow_name: str = "") (decorators: router.get("/workflow-records", tags=["WorkflowRecord"]))
+    - function list_workflows() (decorators: router.get("/workflows", tags=["WorkflowResource"]))
+    - variable router
+    - function update_workflow(workflow: WorkflowSpec) (decorators: router.patch("/workflows/{name}", tags=["WorkflowResource"]))
+constants.py:
+    - variable API_VERSION
+    - variable EXECUTION_ID_HEADER
+    - variable EXECUTION_TYPE_HEADER
+    - variable LOGGER_NAME
+    - variable WORKFLOW_ROUTER_QUEUE
+    - variable WORKSPACE_QUEUE
+db/etcd.py:
+    - variable ETCD_CLIENT
+    - function get_etcd_client()
+    - function wait_for_etcd( client: Optional[etcd3.Etcd3Client] = None, retries: int = 10, delay: float = 1 )
+db/postgres.py:
+    - variable POSTGRES_POOL
+    - function get_postgres_connection()
+    - function setup_postgres()
+    - function teardown_postgres()
+db/qdrant.py:
+    - variable QDRANT_CLIENT
+    - function get_qdrant_client()
+errors.py:
+    - class AgentAlreadyExistsError
+    - class AgentError
+    - class AgentNotFoundError
+    - class AgentNotReadyError
+    - class DeserializationError
+    - class GithubWebhookError
+    - class IdentityAlreadyExistsError
+    - class IdentityError
+    - class IdentityNotFoundError
+    - class InvalidEventError
+    - class InvalidResourceError
+    - class ListenerDisconnectedError
+    - class RosterAPIError
+    - class SetupError
+    - class TeamAlreadyExistsError
+    - class TeamError
+    - class TeamMemberNotFoundError
+    - class TeamNotFoundError
+    - class TeamRoleNotFoundError
+    - class TeardownError
+    - class WorkflowAlreadyExistsError
+    - class WorkflowError
+    - class WorkflowNotFoundError
+    - class WorkflowNotReadyError
+    - class WorkflowRecordAlreadyExistsError
+    - class WorkflowRecordError
+    - class WorkflowRecordNotFoundError
+    - class WorkspaceAlreadyExistsError
+    - class WorkspaceError
+    - class WorkspaceNotFoundError
+events/resource.py:
+    - class DeleteResourceEvent
+        - variable event_type
+        - variable name
+        - variable namespace
+        - variable resource
+        - variable resource_type
+    - class PutResourceEvent
+        - variable event_type
+        - variable name
+        - variable namespace
+        - variable previous_resource
+        - variable resource
+        - variable resource_type
+        - variable spec_changed
+        - variable status_changed
+    - variable ResourceEvent
+events/status.py:
+    - class DeleteStatusEvent
+        - variable event_type
+        - variable host_ip
+        - variable name
+        - variable namespace
+        - variable resource_type
+    - class PutStatusEvent
+        - variable event_type
+        - variable host_ip
+        - variable name
+        - variable namespace
+        - variable resource_type
+        - variable status
+    - variable StatusEvent
+github/app.py:
+    - class RosterGithubApp
+        - member handle_issue_comment
+        - member handle_issue_created
+        - member handle_webhook_payload
+        - member handle_workflow_finish
+        - member setup
+        - member teardown
+github/codebase_tools/tree.py:
+    - class CtagFileTreeGenerator
+        - variable DEFAULT_EXCLUDED_TAGS
+        - variable KIND_DISPLAY_NAMES
+        - member generate_ctags (decorators: staticmethod)
+        - member generate_tree
+        - member parse_ctags
+        - member tag_lines
+    - class Tag
+        - variable children
+        - variable decorators
+        - variable scope
+        - variable scope_kind
+        - variable signature
+    - function build_codebase_tree(root_dir: str)
+github/service.py:
+    - class GithubService
+        - member create_pull_request
+        - member from_webhook_payload (decorators: classmethod)
+        - member get_installation_token
+        - member get_repo_url
+        - member handle_issue_comment
+        - member handle_issue_created
+    - function _github_auth( installation_id: int, token_permissions: Optional[dict[str, str]] = None )
+    - variable private_key
+informers/base.py:
+    - variable E
+    - class Informer
+        - member add_listener (decorators: abstractmethod)
+        - member list_resources (decorators: abstractmethod)
+        - member remove_listener (decorators: abstractmethod)
+        - member setup (decorators: abstractmethod)
+        - member teardown (decorators: abstractmethod)
+    - variable T
+main.py:
+    - unknown activity_router
+    - unknown agent_router
+    - unknown commands_router
+    - function get_app()
+    - unknown github_router
+    - unknown identity_router
+    - function lifespan(app: FastAPI) (decorators: asynccontextmanager)
+    - variable logs_enabled
+    - function main()
+    - variable roster_github_app
+    - function setup()
+    - function setup_logging()
+    - unknown team_router
+    - function teardown()
+    - unknown updates_router
+    - variable workflow_message_router
+    - unknown workflow_router
+    - variable workspace_manager
+messaging/inbox.py:
+    - class AgentInbox
+        - member from_role (decorators: classmethod)
+        - member queue_name (decorators: property)
+        - member send_tool_response
+        - member trigger_action
+messaging/rabbitmq.py:
+    - variable RABBITMQ_CLIENT
+    - class RabbitMQClient
+        - member _create_message_handler
+            - function handle_message(message: IncomingMessage)
+        - member _publish
+        - member _setup_queue_consumer
+        - member connect
+        - member deregister_callback
+        - member disconnect
+        - member publish
+        - member publish_json
+        - member register_callback
+    - function get_rabbitmq()
+    - function setup_rabbitmq(retries: int = 10, delay: float = 2)
+    - function teardown_rabbitmq()
+messaging/workflow.py:
+    - class WorkflowRouter
+        - member _handle_action_report
+        - member _handle_initiate_workflow
+        - member _notify_workflow_finished
+        - member _notify_workflow_started
+        - member _trigger_action
+        - member add_workflow_finish_listener
+        - member add_workflow_start_listener
+        - member remove_workflow_finish_listener
+        - member remove_workflow_start_listener
+        - member route
+        - member setup
+        - member teardown
+    - function _workflow_inputs_are_valid(workflow_spec: WorkflowSpec, payload_inputs: dict)
+models/activity.py:
+    - class ActivityEvent
+        - variable agent_context
+        - variable content
+        - variable execution_id
+        - variable execution_type
+        - variable type
+    - class ActivityType
+        - variable THOUGHT
+        - variable ACTION
+    - class AgentContext
+        - variable identity
+        - variable role
+        - variable team
+    - class ExecutionType
+        - variable TASK
+models/agent.py:
+    - class Action
+        - variable description
+        - variable inputs
+        - variable name
+        - variable outputs
+    - class AgentContainer
+        - variable id
+        - variable image
+        - variable labels
+        - variable name
+        - variable status
+    - class AgentResource
+        - member initial_state (decorators: classmethod)
+        - variable kind
+        - variable spec
+        - variable status
+    - class AgentSpec
+        - variable actions
+        - variable executor
+        - variable image
+        - variable name
+        - variable tag
+    - class AgentStatus
+        - variable container
+        - variable executor
+        - variable host_ip
+        - variable name
+        - variable status
+models/base.py:
+    - class RosterResource
+        - variable api_version
+        - variable kind
+        - variable metadata
+models/chat.py:
+    - class ChatPromptAgentArgs
+        - variable history
+        - variable message
+        - variable role
+        - variable team
+    - class ConversationMessage
+        - variable message
+        - variable sender
+models/common.py:
+    - class TypedArgument
+        - variable name
+        - variable type
+    - class TypedResult
+        - variable type
+        - variable value
+models/identity.py:
+    - class IdentityResource
+        - member initial_state (decorators: classmethod)
+        - variable kind
+        - variable spec
+        - variable status
+    - class IdentitySpec
+        - variable description
+        - variable name
+    - class IdentityStatus
+        - variable name
+        - variable status
+models/outputs.py:
+    - class CodeOutput
+        - variable content
+        - variable filepath
+        - variable kind
+models/team.py:
+    - class Layout
+        - variable roles
+    - class Member
+        - variable agent
+        - variable identity
+    - class Role
+        - variable description
+        - variable name
+    - class TeamResource
+        - member get_member
+        - member get_role_description
+        - member initial_state (decorators: classmethod)
+        - variable kind
+        - variable spec
+        - variable status
+    - class TeamSpec
+        - variable description
+        - variable layout
+        - variable members
+        - variable name
+        - variable type
+        - variable workflows
+    - class TeamStatus
+        - variable members
+        - variable name
+        - variable status
+    - class Workflow
+        - variable inputs
+        - variable name
+        - variable outputs
+models/tool.py:
+    - class Sender
+        - variable name
+        - variable namespace
+    - class ToolMessage
+        - variable data
+        - variable error
+        - variable id
+        - variable kind
+        - variable sender
+        - variable tool
+models/workflow.py:
+    - class InitiateWorkflowArgs
+        - variable inputs
+        - variable workflow
+    - class InitiateWorkflowPayload
+        - variable KEY
+        - variable inputs
+        - variable workspace
+    - variable MESSAGE_PAYLOADS_BY_KIND
+    - class StepResult
+        - variable error
+        - variable outputs
+    - class StepRunConfig
+        - variable num_retries
+    - class StepRunStatus
+        - variable results
+        - variable runs
+    - variable WORKFLOW_MESSAGE_PAYLOADS
+    - class WorkflowActionReportPayload
+        - variable action
+        - variable error
+        - variable outputs
+        - variable step
+        - variable KEY
+    - class WorkflowActionTriggerPayload
+        - variable action
+        - variable inputs
+        - variable role_context
+        - variable step
+        - variable KEY
+    - class WorkflowDerivedState
+        - member build (decorators: classmethod)
+        - variable sorted_steps
+    - class WorkflowFinishEvent
+    - class WorkflowMessage
+        - variable data
+        - variable id
+        - variable kind
+        - member read_contents
+        - variable workflow
+    - class WorkflowRecord
+        - variable context
+        - variable errors
+        - variable id
+        - variable name
+        - variable outputs
+        - variable run_status
+        - variable spec
+        - variable workspace
+    - class WorkflowResource
+        - member initial_state (decorators: classmethod)
+        - variable kind
+        - variable spec
+        - variable status
+    - class WorkflowSpec
+        - variable derived_state
+        - variable description
+        - member get_dependency_graph
+        - variable inputs
+        - variable name
+        - variable outputs
+        - variable steps
+        - variable team
+        - member update_derived_state
+    - class WorkflowStartEvent
+    - class WorkflowStatus
+        - variable name
+        - variable status
+    - class WorkflowStep
+        - variable action
+        - member get_dependencies
+        - variable inputMap
+        - variable outputMap
+        - variable role
+        - variable runConfig
+models/workspace.py:
+    - class GithubWorkspace
+        - variable base_hash
+        - variable branch_name
+        - variable installation_id
+        - variable repository_name
+    - class WorkflowCodeReportPayload
+        - variable code_outputs
+        - variable workflow_name
+        - variable workflow_record
+    - class Workspace
+        - variable github_info
+        - variable kind
+        - variable name
+    - class WorkspaceMessage
+        - variable data
+        - variable kind
+        - variable namespace
+        - variable workspace
+resources/base.py:
+    - class ResourceType
+        - variable Team
+        - variable Workflow
+        - variable Agent
+        - variable Identity
+    - variable etcd_prefixes
+    - function resource_type_from_etcd_prefix(prefix: str)
+    - variable resource_types_by_etcd_prefix
+services/activity.py:
+    - class ActivityService
+        - member fetch_activities
+        - member store_activity
+services/agent.py:
+    - class AgentService
+        - variable DEFAULT_NAMESPACE
+        - variable KEY_PREFIX
+        - member _get_agent_key
+        - member _handle_agent_status_delete
+        - member _handle_agent_status_put
+        - member chat_prompt_agent
+        - member create_agent
+        - member delete_agent
+        - member get_agent
+        - member handle_agent_status_update
+        - member list_agents
+        - member update_agent
+services/identity.py:
+    - class IdentityService
+        - variable KEY_PREFIX
+        - member _get_identity_key
+        - member create_identity
+        - member delete_identity
+        - member get_identity
+        - member list_identities
+        - member update_identity
+        - variable DEFAULT_NAMESPACE
+services/team.py:
+    - class TeamService
+        - member _get_team_key
+        - member create_team
+        - member delete_team
+        - member get_team
+        - member list_teams
+        - member update_team
+        - variable DEFAULT_NAMESPACE
+        - variable KEY_PREFIX
+services/workflow.py:
+    - class WorkflowRecordService
+        - member _get_base_key
+        - member _get_record_key
+        - member _get_workflow_key
+        - member create_workflow_record
+        - member delete_workflow_record
+        - member get_workflow_record
+        - member list_workflow_records
+        - member update_workflow_record
+        - variable DEFAULT_NAMESPACE
+        - variable KEY_PREFIX
+    - class WorkflowService
+        - member _get_workflow_key
+        - member create_workflow
+        - member delete_workflow
+        - member get_workflow
+        - member initiate_workflow
+        - member list_workflows
+        - member update_workflow
+        - variable DEFAULT_NAMESPACE
+        - variable KEY_PREFIX
+services/workspace.py:
+    - class WorkspaceService
+        - member _get_workspace_key
+        - member create_workspace
+        - member delete_workspace
+        - member get_workspace
+        - member list_workspaces
+        - member update_or_create_workspace
+        - variable DEFAULT_NAMESPACE
+        - variable KEY_PREFIX
+settings.py:
+    - variable DEBUG
+    - variable ETCD_HOST
+    - variable ETCD_PORT
+    - variable GITHUB_APP_ID
+    - variable GITHUB_APP_NAME
+    - variable GITHUB_APP_PRIVATE_KEY
+    - variable GITHUB_APP_WEBHOOK_SECRET
+    - variable PORT
+    - variable POSTGRES_DB
+    - variable POSTGRES_HOST
+    - variable POSTGRES_PASSWORD
+    - variable POSTGRES_PORT
+    - variable POSTGRES_USER
+    - variable QDRANT_HOST
+    - variable QDRANT_PORT
+    - variable RABBITMQ_HOST
+    - variable RABBITMQ_PASSWORD
+    - variable RABBITMQ_PORT
+    - variable RABBITMQ_USER
+    - variable RABBITMQ_VHOST
+    - variable SERVER_LOG
+    - variable SERVER_LOG_LEVEL
+    - variable WORKSPACE_DIR
+    - variable env
+singletons.py:
+    - variable ROSTER_GITHUB_APP
+    - variable WORKFLOW_ROUTER
+    - variable WORKSPACE_MANAGER
+    - function get_roster_github_app()
+    - function get_workflow_router()
+    - function get_workspace_manager()
+util/async_helpers.py:
+    - function make_async(func)
+        - function wrapper(*args, **kwargs)
+util/graph_ops.py:
+    - function sort_dependencies(graph: dict[str, set[str]])
+util/serialization.py:
+    - variable T
+    - function deserialize_from_etcd(model: Type[T], data: bytes)
+    - function serialize(model: BaseModel)
+watchers/all.py:
+    - variable ACTIVE_WATCHERS
+    - function setup_watchers()
+    - function teardown_watchers()
+watchers/base.py:
+    - class BaseWatcher
+        - member add_listener (decorators: abstractmethod)
+        - member start (decorators: abstractmethod)
+        - member stop (decorators: abstractmethod)
+        - member watch (decorators: abstractmethod)
+watchers/etcd.py:
+    - class EtcdResourceWatcher
+        - member add_listener
+        - member start
+        - member stop
+        - member watch
+watchers/resource.py:
+    - variable RESOURCE_WATCHER
+    - class ResourceWatcher
+        - member _handle_event
+        - member _process_event (decorators: classmethod)
+        - member add_listener
+        - member remove_listener
+        - member start
+        - member stop
+        - member watch
+        - variable KEY_PREFIX
+    - function get_resource_watcher()
+workspace/git.py:
+    - class GitWorkspace
+        - member auth_env (decorators: property)
+        - member build (decorators: classmethod)
+        - member checkout_branch
+        - member checkout_sha
+        - member clean_repo_dir
+        - member clone_repo
+        - member commit
+        - member create_branch
+        - member force_to_latest
+        - member get_current_head_sha
+        - member open
+        - member push
+        - member setup (decorators: classmethod)
+        - member setup_credentials
+        - member setup_repo
+workspace/manager.py:
+    - class WorkspaceManager
+        - member _handle_incoming_message
+        - member _tool_workspace_file_reader
+        - member build_codebase_tree
+        - member get_base_hash
+        - member handle_tool_message
+        - member handle_workspace_message
+        - member setup
+        - member teardown
