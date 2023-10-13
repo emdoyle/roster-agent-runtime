@@ -4,12 +4,13 @@ import os
 from roster_agent_runtime.agents.local.handle import LocalAgentHandle
 from roster_agent_runtime.logs import app_logger
 
-from scripts.util import consume_agent_outgoing, get_fake_record_id
+from scripts.util import (
+    ROSTER_CODEBASE_TREE_FILE,
+    consume_agent_outgoing,
+    get_fake_record_id,
+)
 
 logger = app_logger()
-
-script_dir = os.path.dirname(os.path.abspath(__file__))
-ROSTER_CODEBASE_TREE_FILE = os.path.join(script_dir, "roster_codebase_tree.txt")
 
 CHANGE_REQUEST = (
     """Remove the 'name' parameter from the patch endpoints for all resource types."""

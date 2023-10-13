@@ -1,3 +1,4 @@
+import os
 import uuid
 
 from roster_agent_runtime.agents.local.handle import LocalAgentHandle
@@ -7,6 +8,9 @@ from roster_agent_runtime.models.messaging import OutgoingMessage
 
 logger = app_logger()
 ROSTER_ROOT_DIR = "/Users/evanmdoyle/Programming/roster/roster_api"
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+ROSTER_CODEBASE_TREE_FILE = os.path.join(script_dir, "roster_codebase_tree.txt")
 
 
 async def handle_file_read_message(handle: LocalAgentHandle, message: OutgoingMessage):
