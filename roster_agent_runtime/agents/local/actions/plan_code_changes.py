@@ -1,11 +1,9 @@
-import os
-
-import openai
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.common import TypedArgument
 
 from ..parsers.xml import XMLTagContentParser
-from .base import SYSTEM_PROMPT, BaseLocalAgentAction, LocalAgentAction
+from ..util.llm import ask_openai
+from .base import SYSTEM_PROMPT, BaseLocalAgentAction
 
 logger = app_logger()
 
@@ -78,23 +76,6 @@ Plan Outline:
 """
 
 
-class DummyPlanCodeChanges(LocalAgentAction):
-    KEY = "PlanCodeChanges"
-
-    async def execute(
-        self, inputs: dict[str, str], context: str = ""
-    ) -> dict[str, str]:
-        return {
-            "implementation_plan": """
-<plan>
-<modify file="roster_api/main.py">
-* Add a nice comment to the top of the file ending with a smiley face
-</modify>
-</plan>
-"""
-        }
-
-
 class PlanCodeChanges(BaseLocalAgentAction):
     KEY = "PlanCodeChanges"
     SIGNATURE = (
@@ -113,27 +94,11 @@ class PlanCodeChanges(BaseLocalAgentAction):
             codebase_tree = inputs["codebase_tree"]
         except KeyError as e:
             raise KeyError(f"Missing required input for {self.KEY}: {e}")
-        system_message = {"content": SYSTEM_PROMPT, "role": "system"}
+
         prompt = PROMPT_TEMPLATE.format(
             role=context, change_request=change_request, codebase_tree=codebase_tree
         )
-        user_message = {"content": prompt, "role": "user"}
-        kwargs = {
-            "api_key": os.environ["ROSTER_OPENAI_API_KEY"],
-            "model": "gpt-4",
-            "messages": [system_message, user_message],
-            "n": 1,
-            "stop": None,
-            "temperature": 0.3,
-        }
-        logger.debug("(plan-code) input: %s", user_message)
-        try:
-            response = await openai.ChatCompletion.acreate(**kwargs)
-            output = response.choices[0]["message"]["content"]
-            logger.debug("(plan-code) output: %s", output)
-        except Exception:
-            logger.exception("(plan-code) Failed to call OpenAI")
-            raise
+        output = await ask_openai(prompt, SYSTEM_PROMPT)
 
         plan_content = XMLTagContentParser(tag="plan").parse(output)
 

@@ -1,10 +1,8 @@
-import os
-
-import openai
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.common import TypedArgument
 
-from .base import SYSTEM_PROMPT, BaseLocalAgentAction, LocalAgentAction
+from ..util.llm import ask_openai
+from .base import SYSTEM_PROMPT, BaseLocalAgentAction
 
 logger = app_logger()
 
@@ -50,15 +48,6 @@ The product should be a ...
 """
 
 
-class DummyWritePRD(LocalAgentAction):
-    KEY = "DistillFeatureRequirements"
-
-    async def execute(
-        self, inputs: dict[str, str], context: str = ""
-    ) -> dict[str, str]:
-        return {"requirements_document": "Do whatever you want"}
-
-
 class WritePRD(BaseLocalAgentAction):
     KEY = "DistillFeatureRequirements"
     SIGNATURE = (
@@ -73,23 +62,10 @@ class WritePRD(BaseLocalAgentAction):
             user_requests = inputs["customer_requests"]
         except KeyError as e:
             raise KeyError(f"Missing required input for {self.KEY}: {e}")
-        system_message = {"content": SYSTEM_PROMPT, "role": "system"}
         prompt = PROMPT_TEMPLATE.format(
             role=context, user_requests=user_requests, format_example=FORMAT_EXAMPLE
         )
-        user_message = {"content": prompt, "role": "user"}
-        kwargs = {
-            "api_key": os.environ["ROSTER_OPENAI_API_KEY"],
-            "model": "gpt-4",
-            "messages": [system_message, user_message],
-            "n": 1,
-            "stop": None,
-            "temperature": 0.3,
-        }
-        logger.debug("(write-prd) input: %s", user_message)
-        response = await openai.ChatCompletion.acreate(**kwargs)
-        output = response.choices[0]["message"]["content"]
-        logger.debug("(write-prd) output: %s", output)
+        output = await ask_openai(prompt, SYSTEM_PROMPT)
 
         self.store_output(output)
         return {"requirements_document": output}

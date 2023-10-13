@@ -9,7 +9,7 @@ from ..parsers.plan import ImplementationPlanParser
 from ..parsers.xml import XMLTagContentParser
 from ..util.file_tools import find_matches
 from ..util.llm import ask_openai
-from .base import SYSTEM_PROMPT, BaseLocalAgentAction, LocalAgentAction
+from .base import SYSTEM_PROMPT, BaseLocalAgentAction
 
 logger = app_logger()
 
@@ -96,24 +96,6 @@ Keep in mind the following rules and requirements.
 [second snippet with your changes, if any]
 </updated_snippet>
 """
-
-
-class DummyWriteCode(LocalAgentAction):
-    KEY = "WriteCode"
-
-    async def execute(
-        self,
-        inputs: dict[str, str],
-        context: str = "",
-    ) -> dict[str, str]:
-        with open("code_output.txt", "r") as f:
-            code = f.read()
-            code_output = {
-                "kind": "new_file",
-                "filepath": "blackjack.py",
-                "content": code,
-            }
-            return {"code": json.dumps(code_output)}
 
 
 class WriteCode(BaseLocalAgentAction):

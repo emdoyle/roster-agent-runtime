@@ -1,4 +1,4 @@
-from .actions.write_prd import DummyWritePRD, WritePRD
+from .actions.write_prd import WritePRD
 from .base import BaseLocalAgent
 
 

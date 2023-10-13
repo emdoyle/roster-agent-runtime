@@ -1,13 +1,12 @@
 import json
-import os
 
-import openai
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.common import TypedArgument
 
 from ..parsers.code import CodeOutput, CodeOutputParser, RefinedCodeResponseParser
 from ..parsers.plan import ImplementationPlanAction, ImplementationPlanParser
-from .base import SYSTEM_PROMPT, BaseLocalAgentAction, LocalAgentAction
+from ..util.llm import ask_openai
+from .base import SYSTEM_PROMPT, BaseLocalAgentAction
 
 logger = app_logger()
 
@@ -44,15 +43,6 @@ Here are some tips:
 """
 
 
-class DummyRefineCode(LocalAgentAction):
-    KEY = "RefineCode"
-
-    async def execute(
-        self, inputs: dict[str, str], context: str = ""
-    ) -> dict[str, str]:
-        return {"refined_code": inputs["code"]}
-
-
 class RefineCode(BaseLocalAgentAction):
     KEY = "RefineCode"
     SIGNATURE = (
@@ -71,7 +61,6 @@ class RefineCode(BaseLocalAgentAction):
         code: CodeOutput,
         plan: ImplementationPlanAction,
     ) -> CodeOutput:
-        system_message = {"content": SYSTEM_PROMPT, "role": "system"}
         prompt = PROMPT_TEMPLATE.format(
             role=role,
             change_request=change_request,
@@ -79,22 +68,7 @@ class RefineCode(BaseLocalAgentAction):
             filename=code.filepath,
             plan=plan.plan,
         )
-        user_message = {"content": prompt, "role": "user"}
-        kwargs = {
-            "api_key": os.environ["ROSTER_OPENAI_API_KEY"],
-            "model": "gpt-4",
-            "messages": [system_message, user_message],
-            "n": 1,
-            "stop": None,
-            "temperature": 0.3,
-        }
-        try:
-            response = await openai.ChatCompletion.acreate(**kwargs)
-            output = response.choices[0]["message"]["content"]
-            logger.debug("(refine-code) output: %s", output)
-        except Exception:
-            logger.exception("(refine-code) Failed to call OpenAI")
-            raise
+        output = await ask_openai(prompt, SYSTEM_PROMPT)
 
         refined_code_content = RefinedCodeResponseParser(
             tag="code", refinement_declined_phrase="OK"
