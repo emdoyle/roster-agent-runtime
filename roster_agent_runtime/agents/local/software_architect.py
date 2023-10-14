@@ -1,11 +1,11 @@
-from .actions.identify_domains import IdentifyDomains
+from .actions.suggest_experts import SuggestExperts
 from .actions.summarize_codebase import SummarizeCodebase
 from .base import BaseLocalAgent
 
 
 class SoftwareArchitect(BaseLocalAgent):
     NAME = "Software Architect"
-    ACTIONS = [IdentifyDomains, SummarizeCodebase]
+    ACTIONS = [SuggestExperts, SummarizeCodebase]
     AGENT_CONTEXT = {}
 
 

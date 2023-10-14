@@ -2,11 +2,8 @@ import asyncio
 
 from roster_agent_runtime.agents.local.handle import LocalAgentHandle
 
-from scripts.util import (
-    ROSTER_CODEBASE_TREE_FILE,
-    consume_agent_outgoing,
-    get_fake_record_id,
-)
+from scripts.util import (ROSTER_CODEBASE_TREE_FILE, consume_agent_outgoing,
+                          get_fake_record_id)
 
 TEST_DESCRIPTION = """
 This project is a Python web service acting as a central API for a system called Roster.
@@ -22,8 +19,8 @@ async def run_test(record_id: str):
     with open(ROSTER_CODEBASE_TREE_FILE, "r") as f:
         codebase_tree = f.read()
     await agent_handle.trigger_action(
-        "Identify",
-        "IdentifyDomains",
+        "Experts",
+        "SuggestExperts",
         {"project_description": TEST_DESCRIPTION, "codebase_tree": codebase_tree},
         "An experienced software architect who specializes in web applications.",
         record_id,
@@ -34,5 +31,5 @@ async def run_test(record_id: str):
 
 if __name__ == "__main__":
     record_id = get_fake_record_id()
-    print(f"IdentifyDomains: {record_id}")
+    print(f"SuggestExperts: {record_id}")
     asyncio.run(run_test(record_id))

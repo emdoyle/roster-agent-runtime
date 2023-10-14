@@ -30,8 +30,6 @@ Keep in mind the following while you do this:
 {codebase_tree}
 -----
 ## Format example
------
-## Entities
 <entity function="filepath:function">
 [description of the significance of this function]
 </entity>
@@ -46,8 +44,51 @@ Keep in mind the following while you do this:
 </entity>"""
 
 
-class IdentifyDomains(BaseLocalAgentAction):
-    KEY = "IdentifyDomains"
+CLUSTER_EXPERTS_PROMPT = """
+Role: {role}
+
+## Instructions
+Your current task is to divide responsibility for parts of a software project across Experts.
+You will receive a simple natural language description of the project.
+You will also be provided with the a list of the most significant entities in the project.
+You should produce a list of Experts according to the Format example below.
+Keep in mind the following while you do this:
+* Each Expert should be responsible for a set of entities which could be seen as having something in common
+* Prefer to assign entities which belong to a common semantic 'layer' to a single Expert
+* Prefer to split responsibilities such that Experts have similar amounts of code to manage when possible
+* All entities should be assigned to AT LEAST ONE Expert, and in exceptional cases may be assigned to more than one Expert (prefer not to do this)
+* A 'miscellaneous' Expert can be used to group several small, peripheral responsibilities when necessary
+* Think step by step before making your selections.
+
+-----
+## Project Description
+{project_description}
+-----
+## Entities
+{entities}
+-----
+## Format example
+<expert name="Expert Name">
+<description>
+[high-level description of the responsibility of this Expert]
+</description>
+<entity dir="directory" />
+<entity class="filepath:class" />
+<entity class="filepath:class" />
+</expert>
+<expert name="Expert Name">
+<description>
+[high-level description of the responsibility of this Expert]
+</description>
+<entity class="filepath:class" />
+<entity function="filepath:function" />
+<entity file="filepath" />
+</expert>
+"""
+
+
+class SuggestExperts(BaseLocalAgentAction):
+    KEY = "SuggestExperts"
     SIGNATURE = (
         (
             TypedArgument.text("project_description"),
@@ -65,12 +106,20 @@ class IdentifyDomains(BaseLocalAgentAction):
         except KeyError as e:
             raise KeyError(f"Missing required input for {self.KEY}: {e}")
 
-        prompt = EXTRACT_ENTITIES_TEMPLATE.format(
+        entity_prompt = EXTRACT_ENTITIES_TEMPLATE.format(
             role=context,
             project_description=project_description,
             codebase_tree=codebase_tree,
         )
-        response = await ask_openai(prompt, SYSTEM_PROMPT)
+        entity_response = await ask_openai(entity_prompt, SYSTEM_PROMPT)
+        # TODO: might want to parse entities, remove overlaps (although overlaps may be significant?)
 
-        self.store_output(response)
-        return {"domains": response}
+        expert_prompt = CLUSTER_EXPERTS_PROMPT.format(
+            role=context,
+            project_description=project_description,
+            entities=entity_response,
+        )
+        expert_response = await ask_openai(expert_prompt, SYSTEM_PROMPT)
+
+        self.store_output(entity_response + "\n" + expert_response)
+        return {"experts": expert_response}

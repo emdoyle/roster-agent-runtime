@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 from roster_agent_runtime.agents.local.handle import LocalAgentHandle
 from roster_agent_runtime.logs import app_logger
