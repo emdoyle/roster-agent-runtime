@@ -7,6 +7,7 @@ from roster_agent_runtime.models.files import FileContents
 from roster_agent_runtime.models.messaging import OutgoingMessage
 
 logger = app_logger()
+# TODO: fix this, should be from root instead of /roster_api
 ROSTER_ROOT_DIR = "/Users/evanmdoyle/Programming/roster/roster_api"
 
 script_dir = os.path.dirname(os.path.abspath(__file__))

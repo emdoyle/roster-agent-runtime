@@ -8,13 +8,19 @@ from .experts import CodeEntity
 class CodebaseTree(BaseModel):
     entities_by_file: dict[str, str] = Field(default_factory=dict)
 
-    def filtered_tree(self, entities: list[CodeEntity]) -> str:
+    def display(self) -> str:
         result_tree = []
         for filepath, content in self.entities_by_file.items():
-            for entity in entities:
-                if entity.includes_path(path=filepath):
-                    result_tree.append(filepath + "\n" + content)
+            result_tree.append(filepath + "\n" + content)
         return "\n".join(result_tree)
+
+    def filtered_tree(self, entities: list[CodeEntity]) -> "CodebaseTree":
+        entities_by_file = {}
+        for filepath, contents in self.entities_by_file.items():
+            for entity in entities:
+                if entity.includes_path(filepath):
+                    entities_by_file[filepath] = contents
+        return CodebaseTree(entities_by_file=entities_by_file)
 
 
 ENTITY_REGEX = re.compile(r"^(\w.*):")

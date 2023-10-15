@@ -7,6 +7,9 @@ class CodeEntity(BaseModel):
     kind: str
     value: str
 
+    def display(self) -> str:
+        return f'<entity {self.kind}="{self.value}" />'
+
     def includes_path(self, path: str) -> bool:
         if self.kind == "directory" and path.startswith(self.value):
             return True
