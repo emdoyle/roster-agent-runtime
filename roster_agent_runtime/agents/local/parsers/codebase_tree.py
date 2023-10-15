@@ -25,17 +25,18 @@ class CodebaseTreeParser:
     def parse(cls, content: str) -> CodebaseTree:
         entities_by_file = {}
         curr_entity = ""
-        curr_entity_content = ""
+        curr_entity_content = []
         for line in content.splitlines():
             entity_match = ENTITY_REGEX.match(line)
             if entity_match:
                 if curr_entity:
-                    entities_by_file[curr_entity] = curr_entity_content
+                    entities_by_file[curr_entity] = "\n".join(curr_entity_content)
                 curr_entity = entity_match.group(1)
+                curr_entity_content = []
             else:
-                curr_entity_content += line + "\n"
+                curr_entity_content.append(line)
 
         if curr_entity:
-            entities_by_file[curr_entity] = curr_entity_content
+            entities_by_file[curr_entity] = "\n".join(curr_entity_content)
 
         return CodebaseTree(entities_by_file=entities_by_file)
