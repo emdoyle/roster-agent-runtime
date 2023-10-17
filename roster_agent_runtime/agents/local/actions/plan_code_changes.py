@@ -1,5 +1,6 @@
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.common import TypedArgument
+from scripts.util import CFN_GITHUB_PR_EXPANDED_FILE, CFN_GITHUB_PR_FILE
 
 from ..parsers.codebase_tree import CodebaseTreeParser
 from ..parsers.xml import XMLTagContentParser
@@ -7,6 +8,8 @@ from ..util.llm import ask_openai
 from .base import SYSTEM_PROMPT, BaseLocalAgentAction
 
 logger = app_logger()
+
+# showing relevant snippets in the order in which they would be invoked
 
 PLAN_INSTRUCTIONS_TEMPLATE = """
 Role: {role}
@@ -16,6 +19,7 @@ You are managing a team of Experts, each responsible for their own part of the c
 Not all files are managed by an Expert, these are typically less significant to the project and can be managed by a generalist.
 In order to more effectively maintain and extend the code, your Experts have read their associated code and prepared summaries.
 You will be provided with their summaries, along with a broader, global summary of the project.
+You will also be provided with a relevant 'narrative', which explains how a single high-level objective is implemented by multiple files in sequence. 
 Your task is now to understand the Requested Changes provided below, and to give high-level instructions to each relevant Expert in order to implement the changes.
 Keep in mind the following while you do this:
 * You are not responsible for deciding exactly which files will be changed, but your instructions should be appropriate for the focus of each Expert
@@ -23,6 +27,7 @@ Keep in mind the following while you do this:
 * You should mention in your instructions whenever an Expert should wait for the changes made by another Expert (e.g. function/class interface changes, name changes etc.) by using the 'dependency' tag as shown in the Format Example
 * If changes are required in files which are NOT managed by any Expert, include all of these in the 'leftover' tag as shown in the Format Example
 * Translate the requested changes into potential changes in the project by thinking step-by-step
+* Prefer to use as few Experts as possible, and to keep your requested changes as simple as possible
 
 -----
 ## Project Summary
@@ -33,6 +38,9 @@ Keep in mind the following while you do this:
 -----
 ## Expert Summaries
 {expert_summaries}
+-----
+## Useful Narratives
+{narratives}
 -----
 ## Requested Changes
 {change_request}
@@ -153,12 +161,16 @@ class PlanCodeChanges(BaseLocalAgentAction):
 
         parsed_tree = CodebaseTreeParser.parse(codebase_tree)
 
+        with open(CFN_GITHUB_PR_FILE, "r") as f:
+            narratives = f.read()
+
         prompt = PLAN_INSTRUCTIONS_TEMPLATE.format(
             role=context,
             project_summary=project_summary,
             codebase_paths="\n".join(parsed_tree.entities_by_file.keys()),
             expert_summaries=expert_summaries,
             change_request=change_request,
+            narratives=narratives,
         )
         output = await ask_openai(prompt, SYSTEM_PROMPT)
 

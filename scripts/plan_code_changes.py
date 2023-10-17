@@ -14,8 +14,8 @@ from scripts.util import (
 logger = app_logger()
 
 CHANGE_REQUEST = """
-When the ImplementFeature Workflow is completed, right now the RosterGithubApp coordinates submitting a Pull Request including the changes.
-I want to add a link to the resulting Pull Request in a comment on the Issue which triggered the workflow.
+When the ImplementFeature Workflow is completed, right now the WorkspaceManager coordinates submitting a Pull Request including the changes.
+I want to add a link to the resulting Pull Request in a comment on the original GitHub Issue which triggered the workflow.
 """
 
 

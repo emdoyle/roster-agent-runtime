@@ -1,0 +1,26 @@
+<narrative title="Github PR Creation">
+<purpose>
+Workflows which are attached to a Github Workspace should produce a Pull Request when they emit Code outputs.
+</purpose>
+<step title="Send Workflow Finish Event">
+<description>
+When the WorkflowRouter receives an ActionReport from an Agent, it is possible that it contains
+the final outputs of the Workflow and therefore the Workflow has finished.
+The Manager checks for this case, and when it occurs, it notifies any listeners with a WorkflowFinishEvent.
+</description>
+</step>
+<step title="Process Workflow Finish Event">
+<description>
+Once the Workflow Finish Event is received, the RosterGithubApp checks whether any of its outputs
+contain code. It then collects any matching outputs and sends them in a WorkspaceMessage to be processed downstream by the WorkspaceManager.
+</description>
+</step>
+<step title="Submit Pull Request">
+<description>
+Once the WorkspaceManager receives the WorkflowCodeReport Payload, it needs to determine
+which Github installation is associated with the Workflow so that it can prepare and submit a Pull Request.
+It uses the identifiers in the payload to look up the relevant resources using Services, then uses the
+GitWorkspace to check out the correct branch, write the changes, and submit the Pull Request.
+</description>
+</step>
+</narrative>

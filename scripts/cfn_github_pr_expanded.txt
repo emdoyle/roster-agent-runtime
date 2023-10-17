@@ -1,0 +1,252 @@
+<narrative title="Github PR Creation">
+<purpose>
+Workflows which are attached to a Github Workspace should produce a Pull Request when they emit Code outputs.
+</purpose>
+<step title="Send Workflow Finish Event">
+<description>
+When the WorkflowRouter receives an ActionReport from an Agent, it is possible that it contains
+the final outputs of the Workflow and therefore the Workflow has finished.
+The Manager checks for this case, and when it occurs, it notifies any listeners with a WorkflowFinishEvent.
+</description>
+<code filepath="messaging/workflow.py">
+    async def _handle_action_report(
+        self, message: WorkflowMessage, payload: WorkflowActionReportPayload
+    ):
+        try:
+            workflow_record = WorkflowRecordService().get_workflow_record(
+                message.workflow, message.id
+            )
+        except errors.WorkflowRecordNotFoundError:
+            logger.debug("(workflow-router) Workflow record not found")
+            logger.warning(
+                "Tried to handle action report %s for workflow %s / %s, but record not found",
+                payload.action,
+                message.workflow,
+                message.id,
+            )
+            return
+
+        workflow_spec = workflow_record.spec
+        try:
+            output_map = workflow_spec.steps[payload.step].outputMap
+        except KeyError:
+            logger.debug("(workflow-router) Step not found")
+            logger.warning(
+                "Tried to handle action report %s for workflow %s / %s, but step '%s' not found",
+                payload.action,
+                message.workflow,
+                message.id,
+                payload.step,
+            )
+            return
+
+        # Update the workflow record with the action's results
+        if payload.error:
+            workflow_record.errors.update(
+                {output_key: payload.error for output_key in output_map.keys()}
+            )
+        else:
+            for output_key, output_value in payload.outputs.items():
+                if output_key in output_map:
+                    workflow_output_key = output_map[output_key]
+                    workflow_record.outputs[workflow_output_key] = output_value
+
+        action_outputs = {
+            f"{payload.step}.{output_key}": output_value
+            for output_key, output_value in payload.outputs.items()
+        }
+        workflow_record.context.update(action_outputs)
+
+        # Update the action's run status in the workflow record
+        run_status = workflow_record.run_status.get(payload.step, StepRunStatus())
+        run_status.runs += 1
+        run_status.results.append(
+            StepResult(outputs=payload.outputs, error=payload.error)
+        )
+        workflow_record.run_status[payload.step] = run_status
+
+        # Update the workflow record in etcd
+        try:
+            WorkflowRecordService().update_workflow_record(workflow_record)
+        except errors.WorkflowRecordNotFoundError:
+            logger.debug("(workflow-router) Workflow record not found")
+            logger.warning(
+                "Tried to update workflow record %s / %s, but record not found",
+                message.workflow,
+                message.id,
+            )
+            return
+
+        # Determine whether the workflow is finished
+        required_outputs = {output.name for output in workflow_spec.outputs}
+        if (
+            workflow_record.outputs.keys() | workflow_record.errors.keys()
+            == required_outputs
+        ):
+            asyncio.create_task(
+                self._notify_workflow_finished(workflow_record=workflow_record)
+            )
+            return
+
+        # Otherwise, trigger the appropriate action messages
+        for step_name, step_details in workflow_spec.steps.items():
+            dependencies_satisfied = all(
+                [
+                    dep in workflow_record.context
+                    for dep in step_details.inputMap.values()
+                ]
+            )
+            if not dependencies_satisfied:
+                continue
+
+            step_run_config = step_details.runConfig
+            step_run_status = workflow_record.run_status.get(step_name, StepRunStatus())
+            action_failed = (
+                step_run_status.results and step_run_status.results[-1].error
+            )
+
+            if step_run_status.runs == 0:
+                # If the action hasn't been triggered yet, trigger it
+                await self._trigger_action(
+                    workflow_record=workflow_record,
+                    step=step_name,
+                    step_details=step_details,
+                )
+            elif action_failed and step_run_config.num_retries >= step_run_status.runs:
+                # If the action errored, and we haven't reached the max number of retries,
+                # trigger the action again
+                await self._trigger_action(
+                    workflow_record=workflow_record,
+                    step=step_name,
+                    step_details=step_details,
+                )
+</code>
+</step>
+<step title="Process Workflow Finish Event">
+<description>
+Once the Workflow Finish Event is received, the RosterGithubApp checks whether any of its outputs
+contain code. It then collects any matching outputs and sends them in a WorkspaceMessage to be processed downstream by the WorkspaceManager.
+</description>
+<code filepath="github/app.py">
+    async def handle_workflow_finish(self, event: WorkflowFinishEvent):
+        workspace_service = WorkspaceService()
+        if not event.workflow_record.workspace:
+            logger.debug(
+                "(roster-gha) Workflow record has no workspace: %s",
+                event.workflow_record.id,
+            )
+            return
+        workspace = workspace_service.get_workspace(event.workflow_record.workspace)
+        workflow_outputs = event.workflow_record.spec.outputs
+
+        code_output_keys = [
+            output.name for output in workflow_outputs if output.type == "code"
+        ]
+
+        if not code_output_keys:
+            logger.debug(
+                "(roster-gha) Finished workflow (%s) has no code outputs",
+                event.workflow_record.id,
+            )
+            return
+
+        code_outputs = []
+        for code_output_key in code_output_keys:
+            try:
+                code_output_payload = json.loads(
+                    event.workflow_record.outputs[code_output_key].value
+                )
+                # We transparently support CodeOutput[] or CodeOutput for the declared 'code' data type
+                if isinstance(code_output_payload, list):
+                    code_outputs.extend(
+                        (CodeOutput(**payload) for payload in code_output_payload)
+                    )
+                else:
+                    code_output = CodeOutput(**code_output_payload)
+                    code_outputs.append(code_output)
+            except Exception as e:
+                logger.error(
+                    "(roster-gha) Failed to parse code output (%s): %s",
+                    code_output_key,
+                    e,
+                )
+                continue
+
+        code_report_payload = WorkflowCodeReportPayload(
+            workflow_name=event.workflow_record.name,
+            workflow_record=event.workflow_record.id,
+            code_outputs=code_outputs,
+        )
+        workspace_message = WorkspaceMessage(
+            workspace=workspace.name,
+            kind="workflow_code_report",
+            data=code_report_payload.dict(),
+        )
+
+        await self.workspace_manager.handle_workspace_message(workspace_message)
+</code>
+</step>
+<step title="Submit Pull Request">
+<description>
+Once the WorkspaceManager receives the WorkflowCodeReport Payload, it needs to determine
+which Github installation is associated with the Workflow so that it can prepare and submit a Pull Request.
+It uses the identifiers in the payload to look up the relevant resources using Services, then uses the
+GitWorkspace to check out the correct branch, write the changes, and submit the Pull Request.
+</description>
+<code filepath="workspace/manager.py">
+    async def handle_workspace_message(self, message: WorkspaceMessage):
+        try:
+            message_payload = WorkflowCodeReportPayload(**message.data)
+        except pydantic.ValidationError as e:
+            logger.error(
+                "(workspace-mgr) Failed to validate workflow code report payload: %s", e
+            )
+            return
+
+        workspace = WorkspaceService().get_workspace(message.workspace)
+        if workspace.kind != "github":
+            logger.debug("(workspace-mgr) Unknown workspace kind: %s", workspace.kind)
+            return
+
+        github_info = workspace.github_info
+        if not github_info:
+            logger.debug("(workspace-mgr) No github info provided by workspace message")
+            return
+
+        github_service = GithubService(
+            installation_id=github_info.installation_id,
+            repository_name=github_info.repository_name,
+        )
+
+        async with self._fs_lock:
+            git_workspace = GitWorkspace.setup(
+                installation_id=github_service.installation_id,
+                repository_name=github_service.repository_name,
+                repo_url=github_service.get_repo_url(),
+                token=github_service.get_installation_token(),
+            )
+            git_workspace.force_to_latest()
+            # TODO: should have a way to pull local branch up to origin if it exists
+            #   (internal to GitWorkspace)
+            git_workspace.checkout_branch(github_info.branch_name)
+
+            for code_output in message_payload.code_outputs:
+                with git_workspace.open(code_output.filepath, "w") as f:
+                    # TODO: support other code_output kinds
+                    f.write(code_output.content)
+
+            git_workspace.commit(
+                f"Committing changes from workflow {message_payload.workflow_name} ({message_payload.workflow_record})"
+            )
+            git_workspace.push()
+
+        # TODO: send better metadata for PRs, commit messages through message payload
+        pr_url = github_service.create_pull_request(
+            title=f"[roster-ai] {message_payload.workflow_name} ({message_payload.workflow_record})",
+            body="This Pull Request was generated by Roster! :star:",
+            head=github_info.branch_name,
+        )
+        logger.info("Created PR for %s: %s", github_info.repository_name, pr_url)
+</code>
+</step>
+</narrative>
