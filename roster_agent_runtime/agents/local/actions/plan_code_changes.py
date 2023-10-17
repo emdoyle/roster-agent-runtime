@@ -1,11 +1,63 @@
 from roster_agent_runtime.logs import app_logger
 from roster_agent_runtime.models.common import TypedArgument
 
+from ..parsers.codebase_tree import CodebaseTreeParser
 from ..parsers.xml import XMLTagContentParser
 from ..util.llm import ask_openai
 from .base import SYSTEM_PROMPT, BaseLocalAgentAction
 
 logger = app_logger()
+
+PLAN_INSTRUCTIONS_TEMPLATE = """
+Role: {role}
+
+## Instructions
+You are managing a team of Experts, each responsible for their own part of the codebase shown below.
+Not all files are managed by an Expert, these are typically less significant to the project and can be managed by a generalist.
+In order to more effectively maintain and extend the code, your Experts have read their associated code and prepared summaries.
+You will be provided with their summaries, along with a broader, global summary of the project.
+Your task is now to understand the Requested Changes provided below, and to give high-level instructions to each relevant Expert in order to implement the changes.
+Keep in mind the following while you do this:
+* You are not responsible for deciding exactly which files will be changed, but your instructions should be appropriate for the focus of each Expert
+* Your instructions should explain to the associated Expert what functionality they must change, remove, or introduce
+* You should mention in your instructions whenever an Expert should wait for the changes made by another Expert (e.g. function/class interface changes, name changes etc.) by using the 'dependency' tag as shown in the Format Example
+* If changes are required in files which are NOT managed by any Expert, include all of these in the 'leftover' tag as shown in the Format Example
+* Translate the requested changes into potential changes in the project by thinking step-by-step
+
+-----
+## Project Summary
+{project_summary}
+-----
+## Codebase Paths
+{codebase_paths}
+-----
+## Expert Summaries
+{expert_summaries}
+-----
+## Requested Changes
+{change_request}
+-----
+## Format example
+Step-by-step thoughts with explanations:
+* Thought 1
+* Thought 2
+...
+
+<plan>
+<expert name="Expert name">
+<instructions>
+[instructions for the Expert]
+</instructions>
+<dependency name="Other Expert name OR 'leftover'">
+[explanation of how this Expert's work may depend on Other Expert's work]
+</collab>
+</expert>
+...
+<leftover>
+[instructions for changes required to files NOT managed by any Expert]
+</leftover>
+</plan>
+"""
 
 PROMPT_TEMPLATE = """
 Role: {role}
@@ -81,6 +133,8 @@ class PlanCodeChanges(BaseLocalAgentAction):
     SIGNATURE = (
         (
             TypedArgument.text("change_request"),
+            TypedArgument.text("project_summary"),
+            TypedArgument.text("expert_summaries"),
             TypedArgument.text("codebase_tree"),
         ),
         (TypedArgument.text("implementation_plan"),),
@@ -90,13 +144,21 @@ class PlanCodeChanges(BaseLocalAgentAction):
         self, inputs: dict[str, str], context: str = ""
     ) -> dict[str, str]:
         try:
+            project_summary = inputs["project_summary"]
+            expert_summaries = inputs["expert_summaries"]
             change_request = inputs["change_request"]
             codebase_tree = inputs["codebase_tree"]
         except KeyError as e:
             raise KeyError(f"Missing required input for {self.KEY}: {e}")
 
-        prompt = PROMPT_TEMPLATE.format(
-            role=context, change_request=change_request, codebase_tree=codebase_tree
+        parsed_tree = CodebaseTreeParser.parse(codebase_tree)
+
+        prompt = PLAN_INSTRUCTIONS_TEMPLATE.format(
+            role=context,
+            project_summary=project_summary,
+            codebase_paths="\n".join(parsed_tree.entities_by_file.keys()),
+            expert_summaries=expert_summaries,
+            change_request=change_request,
         )
         output = await ask_openai(prompt, SYSTEM_PROMPT)
 

@@ -187,7 +187,7 @@ class SummarizeCodebase(BaseLocalAgentAction):
                     expert_summary_response, inclusive=False
                 )
                 expert_summaries.append(
-                    f'<entity name="{expert.name}">\n{entities_display}\n<summary>\n{expert_summary}\n</summary>\n</entity>'
+                    f'<expert name="{expert.name}">\n{entities_display}\n<summary>\n{expert_summary}\n</summary>\n</expert>'
                 )
                 outputs.append(
                     (f"Expert File Summaries: {expert.name}", summaries_by_file)
@@ -199,7 +199,7 @@ class SummarizeCodebase(BaseLocalAgentAction):
                 role=context,
                 project_description=project_description,
                 codebase_paths="\n".join(parsed_tree.entities_by_file.keys()),
-                expert_summaries=expert_summaries,
+                expert_summaries="\n".join(expert_summaries),
             )
             final_summary_response = await ask_openai(
                 final_summary_prompt, SYSTEM_PROMPT

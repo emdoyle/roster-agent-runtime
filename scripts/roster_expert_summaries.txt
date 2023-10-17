@@ -1,0 +1,168 @@
+<expert name="API Expert">
+<entity directory="api" />
+<entity file="api/agent.py" />
+<entity file="api/workflow.py" />
+<summary>
+The Roster web service is a Python-based application that provides a central API for managing multi-agent workflows. It is organized into several modules, each responsible for a specific aspect of the system's functionality.
+
+1. The `api/activity.py` module is responsible for managing activity events. It provides endpoints for creating and retrieving activity events, interacting with the `ActivityService` to perform these operations.
+
+2. The `api/agent.py` module manages Agent resources. It provides CRUD (Create, Read, Update, Delete) operations for these resources, interacting with the `AgentService` to perform these operations.
+
+3. The `api/commands.py` module defines command interfaces for the Roster API. It provides endpoints for initiating workflows and prompting agents to chat.
+
+4. The `api/github.py` module handles GitHub webhooks. It defines an API endpoint that listens for POST requests and processes the payload of the webhook using the `RosterGithubApp`.
+
+5. The `api/identity.py` module manages Identity resources. It provides CRUD operations for these resources, interacting with the `IdentityService` to perform these operations.
+
+6. The `api/team.py` module manages Team resources. It provides CRUD operations for these resources, interacting with the `TeamService` to perform these operations.
+
+7. The `api/updates.py` module handles events and status updates related to resources in the system. It provides endpoints for streaming Server-Sent Events (SSE) to the client and for handling status updates from agents.
+
+8. The `api/workflow.py` module manages workflows and workflow records. It provides CRUD operations for these resources, interacting with the `WorkflowService` to perform these operations.
+
+Each module defines a set of HTTP endpoints using the FastAPI framework and interacts with a corresponding service to perform operations on the underlying data store. The services encapsulate the business logic related to each resource type, such as validation and persistence. This modular design makes the codebase easier to maintain and extend.
+
+</summary>
+</expert>
+<expert name="Database Expert">
+<entity directory="db" />
+<summary>
+
+The Roster web service project is structured around three main database connections: etcd, PostgreSQL, and Qdrant, each managed by its respective file in the `db` directory: `etcd.py`, `postgres.py`, and `qdrant.py`.
+
+`etcd.py` manages the connection to an etcd database, a distributed key-value store used for configuration management and service discovery. It uses a global variable `ETCD_CLIENT` to store the client connection, and provides two main functions: `get_etcd_client()` to establish a connection, and `wait_for_etcd()` to ensure the database is ready for connections.
+
+`postgres.py` is responsible for managing the PostgreSQL database connection. It uses the `asyncpg` library for asynchronous interaction with the database. A global variable `POSTGRES_POOL` is used to manage a pool of database connections. Three main functions are provided: `setup_postgres()` to initialize the connection pool, `teardown_postgres()` to close the connection pool, and `get_postgres_connection()` to acquire a connection from the pool.
+
+`qdrant.py` manages the connection to the Qdrant service, likely used for data storage or querying. It uses a global variable `QDRANT_CLIENT` to store an instance of `QdrantClient` used to interact with the Qdrant service. The main function `get_qdrant_client()` either returns an existing `QdrantClient` instance or creates a new one.
+
+In summary, these files work together to manage connections to various data services used by the Roster web service. They ensure efficient management and use of these connections, crucial for the service's performance and scalability. Each file follows a similar pattern: a global variable to store the connection or pool, and functions to establish, check, or close these connections. This design allows for efficient reuse of connections and resources, and provides a consistent interface for the rest of the project to interact with these services.
+
+</summary>
+</expert>
+<expert name="Messaging Expert">
+<entity file="messaging/rabbitmq.py" />
+<entity file="messaging/workflow.py" />
+<summary>
+The Roster project is a Python web service that manages multi-agent workflows. The two files, `messaging/rabbitmq.py` and `messaging/workflow.py`, play crucial roles in handling messaging and workflow management respectively.
+
+The `messaging/rabbitmq.py` file manages the RabbitMQ messaging for the Roster API. It provides a `RabbitMQClient` class that facilitates connection to a RabbitMQ server, publishing messages to a queue, and registering callbacks to handle incoming messages from a queue. The `connect` and `disconnect` methods manage the connection to the RabbitMQ server. The `publish` and `publish_json` methods are used to send messages to a queue. The `register_callback` and `deregister_callback` methods manage callback functions for a queue. The `get_rabbitmq`, `setup_rabbitmq`, and `teardown_rabbitmq` functions are used to manage the connection to the RabbitMQ server.
+
+The `messaging/workflow.py` file is responsible for routing and management of workflow messages. The `WorkflowRouter` class is the key component in this file, interacting with the RabbitMQ client to manage callbacks for the workflow router queue. The `route` method is responsible for routing incoming messages based on their type. The `_trigger_action`, `_handle_initiate_workflow`, and `_handle_action_report` methods manage the workflow actions and their reports. The `_notify_workflow_started` and `_notify_workflow_finished` methods notify listeners when a workflow has started or finished. The `add_workflow_start_listener`, `remove_workflow_start_listener`, `add_workflow_finish_listener`, and `remove_workflow_finish_listener` methods manage the addition and removal of listeners for workflow start and finish events.
+
+In summary, these two files work together to manage the messaging and workflow routing in the Roster system. The `rabbitmq.py` file handles the messaging infrastructure, while the `workflow.py` file manages the workflow routing based on these messages. This structure allows for efficient handling of multi-agent workflows, with clear separation of concerns between messaging and workflow management.
+
+</summary>
+</expert>
+<expert name="Data Models Expert">
+<entity directory="models" />
+<summary>
+
+The Roster system is a Python web service that provides CRUD endpoints for resources representing configurations for multi-agent workflows. It also manages the Roster Runtime on potentially many other machines, primarily through RabbitMQ messaging. The system is structured around several key entities, each represented by a Python file and associated classes.
+
+The `models/activity.py` file defines the structure of activity-related data in the system, including the types of execution contexts (`ExecutionType`) and events (`ActivityType`), the context of an agent (`AgentContext`), and an event (`ActivityEvent`).
+
+The `models/agent.py` file defines the data structures representing an agent, its actions, and its status. It includes classes for an action (`Action`), an agent's specification (`AgentSpec`), a container that an agent runs in (`AgentContainer`), an agent's status (`AgentStatus`), and an agent resource (`AgentResource`).
+
+The `models/base.py` file defines the `RosterResource` class, a base model for all resources in the Roster system, ensuring that each resource has an API version, a kind, and metadata.
+
+The `models/chat.py` file defines the data models for a conversation message (`ConversationMessage`) and the arguments required to prompt an agent in a chat (`ChatPromptAgentArgs`).
+
+The `models/common.py` file defines two classes, `TypedArgument` and `TypedResult`, which ensure type correctness for arguments and results within the Roster system.
+
+The `models/identity.py` file defines the structure and behavior of the Identity resource in the Roster system, represented by the `IdentityResource` class.
+
+The `models/outputs.py` file defines the `CodeOutput` class, which represents an output of a code execution in the Roster system.
+
+The `models/team.py` file defines the structure and behavior of Teams within the Roster system, including classes for a role within a team (`Role`), the layout of a team (`Layout`), a member of a team (`Member`), a workflow that a team can implement (`Workflow`), the specification of a team (`TeamSpec`), the status of a team (`TeamStatus`), and a team resource (`TeamResource`).
+
+The `models/tool.py` file defines two classes, `Sender` and `ToolMessage`, which structure and validate the data related to tool invocations and their responses.
+
+The `models/workflow.py` file defines the data models and related operations for workflows, including classes for a step in a workflow (`WorkflowStep`), the derived state of a workflow (`WorkflowDerivedState`), the specification of a workflow (`WorkflowSpec`), the status of a workflow (`WorkflowStatus`), a workflow resource (`WorkflowResource`), and various types of payloads related to workflow operations.
+
+The `models/workspace.py` file defines the data structures related to workspaces, including the details of a workspace (`Workspace`), the messages associated with a workspace (`WorkspaceMessage`), and the payload of a workflow code report (`WorkflowCodeReportPayload`).
+
+In summary, the Roster system is a complex web service that manages multi-agent workflows. It is structured around several key entities, each with its own responsibilities and relationships to other entities. Understanding these entities and their interactions is crucial for maintaining and extending the system.
+
+</summary>
+</expert>
+<expert name="Services Expert">
+<entity directory="services" />
+<summary>
+
+The Roster system is a Python web service that acts as a central API for managing multi-agent workflows. It uses an etcd database for storing and retrieving data and RabbitMQ for messaging to trigger actions on agents. The system is organized into several services, each responsible for managing a specific aspect of the system.
+
+The `ActivityService` in `services/activity.py` manages activity events in the system. It stores and retrieves activity events in the database using the `store_activity` and `fetch_activities` methods respectively.
+
+The `AgentService` in `services/agent.py` is responsible for managing agents in the system. It provides CRUD operations for agent resources and handles agent status updates. It also has a method `chat_prompt_agent` for sending chat prompts to agents.
+
+The `IdentityService` in `services/identity.py` handles CRUD operations for Identity resources. It interacts with the etcd key-value store to create, read, update, and delete Identity resources.
+
+The `TeamService` in `services/team.py` manages Team resources. It provides CRUD operations for Team resources and uses the etcd3 client for storing and retrieving data.
+
+The `WorkflowService` and `WorkflowRecordService` in `services/workflow.py` are responsible for managing workflows and their records respectively. They provide CRUD operations for workflows and workflow records. The `WorkflowService` also interacts with RabbitMQ to initiate workflows.
+
+The `WorkspaceService` in `services/workspace.py` manages Workspace entities. It provides CRUD operations for Workspace entities and uses the etcd key-value store for these operations.
+
+In all these services, data is serialized before storage and deserialized after retrieval. Keys for data storage are constructed using a constant prefix, a namespace, and the name of the resource. Errors are raised when a resource does not exist in the database or already exists during creation.
+
+In summary, the Roster system is a well-organized web service that efficiently manages multi-agent workflows using several services that handle different aspects of the system. Each service is responsible for managing a specific resource and interacts with the etcd database and RabbitMQ messaging system to perform its operations.
+
+</summary>
+</expert>
+<expert name="System Configuration Expert">
+<entity file="settings.py" />
+<summary>
+The `settings.py` file serves as the central configuration hub for the Roster project, managing all the environment variables necessary for the application to function correctly. It uses the `environs` library to read and manage these variables, which are initially set from a `.env` file but can be overridden by system environment variables.
+
+The variables configured in this file can be broadly categorized into several groups based on their responsibilities:
+
+1. **Application Settings**: These include `DEBUG` for indicating the application's mode, `SERVER_LOG` and `SERVER_LOG_LEVEL` for configuring the logging system, `WORKSPACE_DIR` for setting the application workspace directory, and `PORT` for specifying the application's running port.
+
+2. **Service Connections**: These variables configure connections to various services that the application interacts with. They include:
+   - `ETCD_HOST` and `ETCD_PORT` for the etcd service, a distributed key-value store.
+   - `POSTGRES_*` variables for the PostgreSQL database.
+   - `RABBITMQ_*` variables for the RabbitMQ server, facilitating messaging between the central API and the Roster Runtime on other machines.
+   - `QDRANT_HOST` and `QDRANT_PORT` for the Qdrant service, used for vector search and storage.
+   - `GITHUB_APP_*` variables for connecting to a GitHub App.
+
+Each of these services plays a crucial role in the application's operation. For instance, the PostgreSQL database stores application data, RabbitMQ enables inter-machine communication, and the GitHub App connection allows for interaction with GitHub.
+
+In summary, `settings.py` is a critical file that sets up the environment for the Roster project, enabling it to connect to necessary services and operate in the correct mode. Understanding this file is key to understanding how the Roster project interacts with its environment and external services.
+
+</summary>
+</expert>
+<expert name="Watchers Expert">
+<entity directory="watchers" />
+<summary>
+
+The Roster API project's codebase is organized around the concept of "watchers", which are responsible for monitoring changes in resources and triggering appropriate actions in response. The watchers are managed by the `watchers/all.py` module, which maintains a list of active watchers and provides functions to set up and tear down these watchers.
+
+The `watchers/base.py` module defines an abstract base class `BaseWatcher` that outlines the common interface for all watcher classes. This interface includes methods for starting and stopping the watcher, initiating the watching process, and adding listeners.
+
+The `watchers/etcd.py` module defines the `EtcdResourceWatcher` class, a concrete implementation of the `BaseWatcher` interface. This class is specifically designed to watch for changes in the etcd key-value store, a critical component of the system's configuration management. It starts the watching process in a new thread, handles the addition of listeners, and manages the lifecycle of the watcher.
+
+The `watchers/resource.py` module defines the `ResourceWatcher` class, another concrete implementation of the `BaseWatcher` interface. This class uses the `EtcdResourceWatcher` to monitor changes in resources, and notifies registered listeners about these changes. It also provides methods for adding and removing listeners.
+
+In essence, the watchers in the Roster API project serve as a bridge between the system's configuration management (via etcd) and the rest of the system. Changes in the etcd store trigger the watchers, which in turn notify the rest of the system, allowing it to react appropriately. This design ensures a high level of responsiveness and adaptability in the system's operation.
+
+</summary>
+</expert>
+<expert name="System Initialization Expert">
+<entity file="main.py" />
+<summary>
+The `main.py` file serves as the entry point for the Roster API, a Python web service that manages multi-agent workflows. It is responsible for initializing the application, routing requests, and shutting down the application when it's no longer needed.
+
+The application setup is handled by the `setup()` function, which initializes logging, establishes connections to Postgres and RabbitMQ, starts the watchers, and sets up the workflow message router, workspace manager, and GitHub app. The `setup_logging()` function specifically sets up the logging system with two handlers for console and file logging. The `teardown()` function is responsible for shutting down the application, reversing the operations done in `setup()`.
+
+The `lifespan()` function is an asynchronous context manager that ensures the application setup and teardown are handled when the context is entered and exited, respectively.
+
+The `get_app()` function creates a FastAPI application, sets up CORS middleware, and includes routers for various resources such as agents, activities, identities, teams, updates, workflows, and commands. These routers are responsible for handling requests related to their respective resources. The GitHub router is included separately with a "/github" prefix.
+
+The `main()` function is responsible for running the FastAPI application. It retrieves the application from `get_app()` and runs it using Uvicorn, listening on the host "0.0.0.0" and the port specified in the settings.
+
+The application is started by calling `main()` if the file is run as a script. This high-level structure allows for clear separation of concerns, with each function and router handling a specific part of the application's functionality.
+
+</summary>
+</expert>

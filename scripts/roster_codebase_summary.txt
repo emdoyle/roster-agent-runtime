@@ -1,0 +1,19 @@
+The Roster API project is a Python-based web service designed to manage multi-agent workflows. It is organized into several modules, each responsible for a specific aspect of the system's functionality.
+
+The API layer, managed by several modules under the `api` directory, provides CRUD operations for resources such as Agent, Activity, Identity, Team, and Workflow. Each module interacts with a corresponding service to perform operations on the underlying data store. The services encapsulate the business logic related to each resource type, such as validation and persistence.
+
+The project uses three main database connections: etcd, PostgreSQL, and Qdrant, each managed by its respective file in the `db` directory. These files ensure efficient management and use of these connections, crucial for the service's performance and scalability.
+
+Messaging within the system is handled by the `messaging/rabbitmq.py` and `messaging/workflow.py` files. The former manages the RabbitMQ messaging infrastructure, while the latter manages the routing of workflow messages based on their type.
+
+The system's data structures are defined in the `models` directory. These models represent key entities such as Agent, Activity, Identity, Team, and Workflow, and their interactions are crucial for maintaining and extending the system.
+
+The `services` directory contains files that manage different aspects of the system, such as Activity, Agent, Identity, Team, Workflow, and Workspace. Each service interacts with the etcd database and RabbitMQ messaging system to perform its operations.
+
+The `settings.py` file serves as the central configuration hub for the project, managing all the environment variables necessary for the application to function correctly. It configures connections to various services that the application interacts with, including etcd, PostgreSQL, RabbitMQ, Qdrant, and GitHub App.
+
+The concept of "watchers" is used to monitor changes in resources and trigger appropriate actions in response. The watchers are managed by the `watchers/all.py` module, which maintains a list of active watchers and provides functions to set up and tear down these watchers.
+
+Finally, the `main.py` file serves as the entry point for the Roster API. It is responsible for initializing the application, routing requests, and shutting down the application when it's no longer needed.
+
+In summary, the Roster API project is a well-organized web service that efficiently manages multi-agent workflows. It uses a modular design, with clear separation of concerns between different aspects of the system, making it easier to maintain and extend.
