@@ -1,0 +1,164 @@
+<narrative title="Github Issue Causes Workflow Initiation">
+<purpose>
+When an Issue is created in the Github repository where Roster is installed, the ImplementFeature workflow
+should be initiated with the purpose of implementing the changes requested in the Issue.
+</purpose>
+<step title="Receive Issue Creation Webhook">
+<description>
+Roster receives a webhook payload from Github indicating that an Issue has been created.
+</description>
+<code filepath="github/app.py">
+    async def handle_webhook_payload(self, payload: dict):
+        github_service = GithubService.from_webhook_payload(payload=payload)
+
+        if "issue" in payload and payload["action"] in [
+            "opened",
+            "reopened",
+        ]:
+            await self.handle_issue_created(
+                github_service=github_service, payload=payload
+            )
+
+        elif "issue" in payload and "comment" in payload:
+            await self.handle_issue_comment(
+                github_service=github_service, payload=payload
+            )
+        else:
+            logger.debug("(roster-gha) Unrecognized payload: %s", payload)
+</code>
+</step>
+<step title="Handle Issue Creation">
+<description>
+The Issue creation payload is handled by the RosterGithubApp, which prepares the associated Workspace and uses
+the WorkflowService to initiate the 'ImplementFeature' workflow. Finally, the RosterGithubApp uses the GithubService to
+leave a comment on the Issue indicating that work has begun.
+</description>
+<code filepath="github/app.py">
+    async def handle_issue_created(self, github_service: GithubService, payload: dict):
+        try:
+            issue_title = payload["issue"]["title"]
+            issue_number = payload["issue"]["number"]
+            issue_body = payload["issue"]["body"]
+        except KeyError:
+            logger.error("(roster-gha) Failed to parse issue title from payload")
+            return
+
+        base_hash = await self.workspace_manager.get_base_hash(
+            github_service=github_service, branch="main"
+        )
+        workspace = Workspace(
+            name=f"issue-{issue_number}",
+            kind="github",
+            github_info=GithubWorkspace(
+                installation_id=github_service.installation_id,
+                repository_name=github_service.repository_name,
+                branch_name=f"issue-{issue_number}",
+                base_hash=base_hash,
+            ),
+        )
+        WorkspaceService().update_or_create_workspace(workspace=workspace)
+        await WorkflowService().initiate_workflow(
+            workflow_name="ImplementFeature",
+            inputs={
+                "change_request": f"Title: {issue_title}\n\nRequest:\n{issue_body}",
+                "codebase_tree": await self.workspace_manager.build_codebase_tree(
+                    github_service=github_service
+                ),
+            },
+            workspace_name=workspace.name,
+        )
+        await github_service.handle_issue_created(payload=payload)
+</code>
+</step>
+<step title="Send Workflow Initiation Message">
+<description>
+The WorkflowService receives inputs intended for the ImplementFeature workflow, and prepares the associated JSON message
+to deliver to the WorkflowRouter via RabbitMQ.
+</description>
+<code filepath="services/workflow.py">
+    async def initiate_workflow(
+        self, workflow_name: str, inputs: dict, workspace_name: str = ""
+    ):
+        workflow = self.get_workflow(workflow_name)
+        logger.debug(
+            "Sent message to initiate workflow %s with inputs: %s",
+            workflow_name,
+            inputs,
+        )
+        await self.rmq.publish_json(
+            WORKFLOW_ROUTER_QUEUE,
+            {
+                "id": str(uuid.uuid4()),
+                "workflow": workflow.spec.name,
+                "kind": "initiate_workflow",
+                "data": {"inputs": inputs, "workspace": workspace_name},
+            },
+        )
+</code>
+</step>
+<step title="Handle Workflow Initiation Message">
+<description>
+When the WorkflowRouter receives a Workflow Initiation message, it creates the associated WorkflowRecord to hold state
+about workflow execution. Then it determines which Actions in the workflow should be triggered, and sends messages to the
+appropriate Agents to trigger those Actions.
+</description>
+<code filepath="messaging/workflow.py">
+    async def _handle_initiate_workflow(
+        self, message: WorkflowMessage, payload: InitiateWorkflowPayload
+    ):
+        workflow_resource = WorkflowService().get_workflow(message.workflow)
+        workflow_spec = workflow_resource.spec
+
+        # Validate inputs match workflow spec inputs
+        if not _workflow_inputs_are_valid(workflow_spec, payload.inputs):
+            logger.debug("(workflow-router) Invalid inputs")
+            logger.warning(
+                "Tried to initiate workflow %s with inputs %s, but inputs are invalid",
+                message.workflow,
+                payload.inputs,
+            )
+            return
+
+        # Create a WorkflowRecord to hold state on this workflow execution
+        try:
+            workflow_record = WorkflowRecordService().create_workflow_record(
+                workflow_spec=workflow_spec,
+                inputs=payload.inputs,
+                workspace_name=payload.workspace,
+            )
+        except errors.WorkflowRecordAlreadyExistsError:
+            logger.debug("(workflow-router) Workflow record already exists")
+            logger.warning(
+                "Tried to initiate workflow %s with inputs %s, but record already exists",
+                message.workflow,
+                payload.inputs,
+            )
+            return
+
+        workflow_spec_snapshot = workflow_record.spec
+        # Notify listeners that the workflow has started
+        asyncio.create_task(
+            self._notify_workflow_started(workflow_record=workflow_record)
+        )
+
+        for step_name, step_details in workflow_spec_snapshot.steps.items():
+            # If all dependencies are satisfied, trigger the action
+            if all(
+                [
+                    dep in workflow_record.context
+                    for dep in step_details.inputMap.values()
+                ]
+            ):
+                logger.debug(
+                    "(workflow-router) Triggering step %s (%s)",
+                    step_name,
+                    step_details.action,
+                )
+                await self._trigger_action(
+                    workflow_record=workflow_record,
+                    step=step_name,
+                    step_details=step_details,
+                )
+</code>
+</step>
+</narrative>

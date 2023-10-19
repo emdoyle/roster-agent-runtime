@@ -1,0 +1,31 @@
+<narrative title="Github Issue Causes Workflow Initiation">
+<purpose>
+When an Issue is created in the Github repository where Roster is installed, the ImplementFeature workflow
+should be initiated with the purpose of implementing the changes requested in the Issue.
+</purpose>
+<step title="Receive Issue Creation Webhook">
+<description>
+Roster receives a webhook payload from Github indicating that an Issue has been created.
+</description>
+</step>
+<step title="Handle Issue Creation">
+<description>
+The Issue creation payload is handled by the RosterGithubApp, which prepares the associated Workspace and uses
+the WorkflowService to initiate the 'ImplementFeature' workflow. Finally, the RosterGithubApp uses the GithubService to
+leave a comment on the Issue indicating that work has begun.
+</description>
+</step>
+<step title="Send Workflow Initiation Message">
+<description>
+The WorkflowService receives inputs intended for the ImplementFeature workflow, and prepares the associated JSON message
+to deliver to the WorkflowRouter via RabbitMQ.
+</description>
+</step>
+<step title="Handle Workflow Initiation Message">
+<description>
+When the WorkflowRouter receives a Workflow Initiation message, it creates the associated WorkflowRecord to hold state
+about workflow execution. Then it determines which Actions in the workflow should be triggered, and sends messages to the
+appropriate Agents to trigger those Actions.
+</description>
+</step>
+</narrative>

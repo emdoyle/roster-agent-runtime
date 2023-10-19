@@ -39,7 +39,7 @@ Here are some tips:
 ## Format example
 <code>
 [your code here OR simply 'OK']
-</code
+</code>
 """
 
 

@@ -1,6 +1,6 @@
 from .actions.plan_code_changes import PlanCodeChanges
 from .actions.refine_code import RefineCode
-from .actions.write_code import WriteCode
+from .actions.write_code.action import WriteCode
 from .base import BaseLocalAgent
 
 

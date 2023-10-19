@@ -1,7 +1,5 @@
 <expert name="API Expert">
 <entity directory="api" />
-<entity file="api/agent.py" />
-<entity file="api/workflow.py" />
 <summary>
 The Roster web service is a Python-based application that provides a central API for managing multi-agent workflows. It is organized into several modules, each responsible for a specific aspect of the system's functionality.
 

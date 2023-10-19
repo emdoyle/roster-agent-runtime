@@ -14,8 +14,13 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 ROSTER_CODEBASE_TREE_FILE = os.path.join(script_dir, "roster_codebase_tree.txt")
 ROSTER_CODEBASE_SUMMARY_FILE = os.path.join(script_dir, "roster_codebase_summary.txt")
 ROSTER_EXPERT_SUMMARIES_FILE = os.path.join(script_dir, "roster_expert_summaries.txt")
+ROSTER_EXTENDED_EXPERTS_FILE = os.path.join(script_dir, "roster_extended_experts.txt")
 CFN_GITHUB_PR_FILE = os.path.join(script_dir, "cfn_github_pr.txt")
 CFN_GITHUB_PR_EXPANDED_FILE = os.path.join(script_dir, "cfn_github_pr_expanded.txt")
+CFN_WORKFLOW_INIT_FILE = os.path.join(script_dir, "cfn_workflow_initiate.txt")
+CFN_WORKFLOW_INIT_EXPANDED_FILE = os.path.join(
+    script_dir, "cfn_workflow_init_expanded.txt"
+)
 
 
 async def handle_file_read_message(handle: LocalAgentHandle, message: OutgoingMessage):

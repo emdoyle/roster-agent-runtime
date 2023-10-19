@@ -36,6 +36,7 @@ class Expert(BaseModel):
     name: str
     description: str
     entities: list[CodeEntity] = Field(default_factory=list)
+    summary: str = ""
 
 
 class ExpertsParser:
@@ -53,6 +54,9 @@ class ExpertsParser:
                             entity_from_attributes(entity.attrib)
                             for entity in expert.findall("entity")
                         ],
+                        summary=expert.find("summary").text
+                        if expert.find("summary")
+                        else "",
                     )
                 )
         except ElementTree.ParseError as e:

@@ -1,0 +1,68 @@
+<expert name="API Expert">
+<description>
+This expert is responsible for managing the API endpoints of the Roster system, ensuring the correct functioning of the system's interface.
+</description>
+<entity dir="api" />
+</expert>
+<expert name="Database Expert">
+<description>
+This expert handles the connections and interactions with the databases used in the project, ensuring data persistence and retrieval.
+</description>
+<entity dir="db" />
+</expert>
+<expert name="Github Integration Expert">
+<description>
+This expert is in charge of the code handling Github events and interactions, ensuring smooth integration with Github services.
+</description>
+<entity dir="github" />
+</expert>
+<expert name="Messaging Expert">
+<description>
+This expert is responsible for managing all the messaging within the system, particularly RabbitMQ interactions, ensuring effective communication between different parts of the system.
+</description>
+<entity dir="messaging" />
+</expert>
+<expert name="Data Modeling Expert">
+<description>
+This expert is responsible for managing the data models used in the system, defining the structure of the data used in the application.
+</description>
+<entity dir="models" />
+</expert>
+<expert name="Service Management Expert">
+<description>
+This expert is in charge of the business logic for different entities in the system, ensuring the correct functioning of the system.
+</description>
+<entity dir="services" />
+</expert>
+<expert name="Resource Monitoring Expert">
+<description>
+This expert is responsible for monitoring changes in resources and triggering appropriate actions, maintaining the state of the system.
+</description>
+<entity dir="watchers" />
+</expert>
+<expert name="Application Configuration Expert">
+<description>
+This expert is responsible for setting up the application, including routing, logging, the application lifecycle, and managing configuration settings.
+</description>
+<entity file="main.py" />
+<entity file="settings.py" />
+</expert>
+<expert name="Error Handling Expert">
+<description>
+This expert is responsible for defining all the custom exceptions that can be raised in the application, aiding in error handling and debugging.
+</description>
+<entity file="errors.py" />
+</expert>
+<expert name="Event Management Expert">
+<description>
+This expert is responsible for managing the events within the system, ensuring the correct functioning of the event-driven architecture.
+</description>
+<entity dir="events" />
+</expert>
+<expert name="Workspace Expert">
+<description>
+This expert is responsible for managing Workspace usage, including some interactions with Git in order to manage codebase files.
+It is also responsible for the WorkspaceManager, which handles some Workflow-related events which affect codebase files.
+</description>
+<entity dir="workspace" />
+</expert>

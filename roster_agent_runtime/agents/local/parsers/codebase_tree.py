@@ -14,6 +14,14 @@ class CodebaseTree(BaseModel):
             result_tree.append(filepath + "\n" + content)
         return "\n".join(result_tree)
 
+    def remaining_tree(self, entities: list[CodeEntity]) -> "CodebaseTree":
+        entities_by_file = {}
+        for filepath, contents in self.entities_by_file.items():
+            if not any((entity.includes_path(filepath) for entity in entities)):
+                # potential problem here with low-scope entities like classes, files, they exclude the whole file
+                entities_by_file[filepath] = contents
+        return CodebaseTree(entities_by_file=entities_by_file)
+
     def filtered_tree(self, entities: list[CodeEntity]) -> "CodebaseTree":
         entities_by_file = {}
         for filepath, contents in self.entities_by_file.items():

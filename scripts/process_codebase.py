@@ -80,26 +80,26 @@ async def run_test(record_id: str):
     task = asyncio.create_task(consume_agent_outgoing(agent_handle))
     with open(ROSTER_CODEBASE_TREE_FILE, "r") as f:
         codebase_tree = f.read()
-    # await agent_handle.trigger_action(
-    #     "Experts",
-    #     "SuggestExperts",
-    #     {"project_description": TEST_DESCRIPTION, "codebase_tree": codebase_tree},
-    #     "An experienced software architect who specializes in web applications.",
-    #     record_id,
-    #     "ProcessCodebase",
-    # )
     await agent_handle.trigger_action(
-        "Summarize",
-        "SummarizeCodebase",
-        {
-            "project_description": TEST_DESCRIPTION,
-            "codebase_tree": codebase_tree,
-            "experts": TEST_EXPERTS,
-        },
+        "Experts",
+        "SuggestExperts",
+        {"project_description": TEST_DESCRIPTION, "codebase_tree": codebase_tree},
         "An experienced software architect who specializes in web applications.",
         record_id,
         "ProcessCodebase",
     )
+    # await agent_handle.trigger_action(
+    #     "Summarize",
+    #     "SummarizeCodebase",
+    #     {
+    #         "project_description": TEST_DESCRIPTION,
+    #         "codebase_tree": codebase_tree,
+    #         "experts": TEST_EXPERTS,
+    #     },
+    #     "An experienced software architect who specializes in web applications.",
+    #     record_id,
+    #     "ProcessCodebase",
+    # )
     await task
 
 
