@@ -1,3 +1,5 @@
+import uuid
+
 from roster_agent_runtime.agents.local.actions.base import SYSTEM_PROMPT
 from roster_agent_runtime.agents.local.parsers.codebase_tree import CodebaseTree
 from roster_agent_runtime.agents.local.parsers.plan import (
@@ -7,7 +9,10 @@ from roster_agent_runtime.agents.local.parsers.plan import (
 )
 from roster_agent_runtime.agents.local.parsers.xml import XMLTagContentParser
 from roster_agent_runtime.agents.local.util.llm import ask_openai
+from roster_agent_runtime.logs import app_logger
 from scripts.util import CFN_GITHUB_PR_EXPANDED_FILE, CFN_WORKFLOW_INIT_EXPANDED_FILE
+
+logger = app_logger()
 
 EXPERT_PLAN_TEMPLATE = """
 Role: {role}
@@ -87,10 +92,12 @@ async def generate_expert_implementation_plan(
         narratives="\n\n".join(expanded_narratives),
     )
     plan_response = await ask_openai(prompt, SYSTEM_PROMPT)
+    rid = str(uuid.uuid4())
     with open(
-        f"/Users/evanmdoyle/Programming/roster-agent-runtime/action_outputs/WriteCode/fake-test-{instructions.name}.txt",
+        f"/Users/evanmdoyle/Programming/roster-agent-runtime/action_outputs/WriteCode/fake-test-{instructions.name}-{rid}.txt",
         "w",
     ) as f:
+        logger.info("Writing %s %s", instructions.name, rid)
         f.write(prompt + "\n\n------------------\n\n" + plan_response)
     plan_content = XMLTagContentParser(tag="plan").parse(plan_response)
 
